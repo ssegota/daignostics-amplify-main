@@ -36,6 +36,8 @@ const ExperimentDetails: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [generating, setGenerating] = useState(false);
+    const [showPreview, setShowPreview] = useState(false);
+    const [reportData, setReportData] = useState<{ analysis: string; downloadUrl: string; fileName: string } | null>(null);
 
     useEffect(() => {
         if (!id) return;
@@ -120,9 +122,13 @@ const ExperimentDetails: React.FC = () => {
             const result = await response.json();
 
             if (result.success && result.downloadUrl) {
-                // Open download URL in new tab
-                window.open(result.downloadUrl, '_blank');
-                alert('✅ Report generated successfully! Download started.');
+                // Show preview modal with analysis
+                setReportData({
+                    analysis: result.analysis || 'Analysis not available',
+                    downloadUrl: result.downloadUrl,
+                    fileName: result.fileName || 'report.pdf'
+                });
+                setShowPreview(true);
             } else {
                 throw new Error('Invalid response from server');
             }
@@ -299,6 +305,44 @@ const ExperimentDetails: React.FC = () => {
                             )}
                         </button>
                     </div>
+
+                    {/* Report Preview Modal */}
+                    {showPreview && reportData && (
+                        <div className="modal-overlay" onClick={() => setShowPreview(false)}>
+                            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                                <div className="modal-header">
+                                    <h2>📄 Report Generated Successfully</h2>
+                                    <button className="modal-close" onClick={() => setShowPreview(false)}>×</button>
+                                </div>
+                                <div className="modal-body">
+                                    <div className="report-preview">
+                                        <h3>Clinical Interpretation</h3>
+                                        <p style={{ lineHeight: '1.6', marginBottom: '1.5rem' }}>{reportData.analysis}</p>
+
+                                        <div style={{ borderTop: '1px solid #ddd', paddingTop: '1rem', marginTop: '1rem' }}>
+                                            <p style={{ fontSize: '0.9rem', color: '#666' }}>
+                                                <strong>File:</strong> {reportData.fileName}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="modal-footer">
+                                    <button className="btn btn-secondary" onClick={() => setShowPreview(false)}>
+                                        Close
+                                    </button>
+                                    <button
+                                        className="btn btn-primary"
+                                        onClick={() => {
+                                            window.open(reportData.downloadUrl, '_blank');
+                                            setShowPreview(false);
+                                        }}
+                                    >
+                                        📥 Download PDF
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </>

@@ -4,8 +4,12 @@ set -e
 echo "🔨 Building ReportLab Lambda Layer (No PIL)"
 echo "=============================================="
 
-# Clean up previous builds
-rm -rf python reportlab-layer.zip
+# Clean up previous builds (Docker creates files as root, need sudo)
+if [ -d "python" ]; then
+    echo "Cleaning up previous build..."
+    sudo rm -rf python
+fi
+rm -f reportlab-layer.zip
 
 # Create layer directory structure
 mkdir -p python
@@ -15,10 +19,10 @@ echo "📦 Installing ReportLab with Docker (Amazon Linux)..."
 
 # Use Docker with Amazon Linux 2 Python 3.11 (matches Lambda runtime)
 docker run --rm \
-  --entrypoint "" \
+  --entrypoint /bin/bash \
   -v "$PWD":/var/task \
   public.ecr.aws/lambda/python:3.11 \
-  bash -c "pip install reportlab -t /var/task/python/ --no-cache-dir"
+  -c "pip install reportlab -t /var/task/python/ --no-cache-dir"
 
 echo ""
 echo "📦 Creating layer zip file..."
@@ -30,7 +34,7 @@ echo "📦 File: reportlab-layer.zip"
 echo "📊 Size: $(du -h reportlab-layer.zip | cut -f1)"
 
 # Clean up
-rm -rf python
+sudo rm -rf python
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

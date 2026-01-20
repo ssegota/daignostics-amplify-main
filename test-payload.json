@@ -1,0 +1,15 @@
+{
+    "doctorUsername": "drjones",
+    "patientName": "John Doe",
+    "measurements": {
+        "peakCounts": 45.0,
+        "amplitude": 5.23,
+        "auc": 750.5,
+        "fwhm": 2.1,
+        "frequency": 50.3,
+        "snr": 35.8,
+        "skewness": 0.5,
+        "kurtosis": 3.2,
+        "generationDate": "2026-01-20T10:30:00.000Z"
+    }
+}

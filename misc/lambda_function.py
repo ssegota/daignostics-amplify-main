@@ -31,7 +31,7 @@ s3_client = boto3.client('s3')
 # Configuration
 S3_BUCKET = os.environ.get('S3_BUCKET', 'daignostics-reports')
 S3_PREFIX = 'reports/'
-BEDROCK_MODEL_ID = 'deepseek-r1'  # Adjust based on actual model ID
+BEDROCK_MODEL_ID = 'us.anthropic.claude-3-haiku-20240307-v1:0'  # Claude 3 Haiku inference profile
 
 def lambda_handler(event, context):
     """
@@ -121,6 +121,7 @@ def lambda_handler(event, context):
                 'downloadUrl': download_url,
                 's3Uri': f"s3://{S3_BUCKET}/{s3_key}",
                 'fileName': file_name,
+                'analysis': bedrock_response,  # Include AI analysis for preview
                 'message': 'Report generated successfully'
             })
         }
@@ -141,13 +142,13 @@ def lambda_handler(event, context):
 
 def get_bedrock_analysis(measurements):
     """
-    Send measurements to Amazon Bedrock (DeepSeek) for analysis.
+    Send measurements to Amazon Bedrock (Claude) for AI analysis.
     
     Args:
         measurements (dict): Dictionary of experiment measurements
         
     Returns:
-        str: Analysis text from Bedrock
+        str: Analysis text from Claude
     """
     # Format measurements for prompt
     measurements_text = "\n".join([
@@ -166,12 +167,17 @@ Please provide a brief medical interpretation focusing on:
 
 Keep the response concise (3-4 sentences)."""
     
-    # Prepare request for Bedrock
+    # Prepare request for Bedrock (Anthropic Messages API format)
     request_body = {
-        "prompt": prompt,
+        "anthropic_version": "bedrock-2023-05-31",
         "max_tokens": 500,
         "temperature": 0.7,
-        "top_p": 0.9
+        "messages": [
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ]
     }
     
     try:
@@ -184,8 +190,8 @@ Keep the response concise (3-4 sentences)."""
         
         response_body = json.loads(response['body'].read())
         
-        # Extract text from response (adjust based on actual DeepSeek response format)
-        analysis = response_body.get('completion', response_body.get('text', 'No analysis generated'))
+        # Extract text from Anthropic response
+        analysis = response_body.get('content', [{}])[0].get('text', 'No analysis generated')
         
         return analysis
         
