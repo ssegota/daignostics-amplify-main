@@ -209,6 +209,12 @@ const ExperimentDetails: React.FC = () => {
                             </div>
                         ))}
                     </div>
+
+                    <div className="mt-lg" style={{ textAlign: 'center' }}>
+                        <button className="btn btn-primary" onClick={() => alert('Report generation coming soon!')}>
+                            📄 Generate Report
+                        </button>
+                    </div>
                 </div>
             </div>
         </>

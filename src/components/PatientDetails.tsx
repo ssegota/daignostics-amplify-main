@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { generateClient } from 'aws-amplify/data';
 import type { Schema } from '../../amplify/data/resource';
 import { useAuth } from '../AuthContext';
+import CSVUpload from './CSVUpload';
 
 const client = generateClient<Schema>();
 
@@ -148,6 +149,10 @@ const PatientDetails: React.FC = () => {
                     </div>
 
                     <h2 className="mt-lg mb-md">Experiments</h2>
+
+                    <div className="mb-lg">
+                        <CSVUpload patientId={id!} onUploadComplete={fetchPatientAndExperiments} />
+                    </div>
 
                     {experiments.length === 0 ? (
                         <div className="empty-state">

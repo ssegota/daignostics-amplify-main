@@ -419,6 +419,43 @@ textarea::placeholder {
   color: var(--primary-red);
 }
 
+/* CSV Upload */
+.csv-upload-container {
+  margin-bottom: var(--spacing-lg);
+}
+
+.csv-drop-zone {
+  border: 2px dashed var(--gray);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-xl);
+  text-align: center;
+  background-color: var(--white);
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.csv-drop-zone:hover {
+  border-color: var(--primary-red);
+  background-color: var(--off-white);
+}
+
+.csv-drop-zone.drag-active {
+  border-color: var(--primary-red);
+  background-color: var(--light-gray);
+  transform: scale(1.02);
+}
+
+.csv-icon {
+  font-size: 3rem;
+  margin-bottom: var(--spacing-md);
+}
+
+.csv-hint {
+  font-size: var(--font-size-sm);
+  color: var(--dark-gray);
+  margin-top: var(--spacing-xs);
+}
+
 /* Utility Classes */
 .text-center {
   text-align: center;

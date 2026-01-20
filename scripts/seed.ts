@@ -97,7 +97,37 @@ async function seedDatabase() {
     console.log('\nCreating experiments for patients...');
 
     let totalExperiments = 0;
+
+    // Group patients by doctor to ensure 1-2 per doctor have no experiments
+    const patientsByDoctor: { [key: string]: string[] } = {};
+    const allPatients = await client.models.Patient.list();
+
+    allPatients.data?.forEach((patient) => {
+        if (patient.doctor && patient.id) {
+            if (!patientsByDoctor[patient.doctor]) {
+                patientsByDoctor[patient.doctor] = [];
+            }
+            patientsByDoctor[patient.doctor].push(patient.id);
+        }
+    });
+
+    // For each doctor, randomly select 1-2 patients to have NO experiments
+    const patientsWithoutExperiments = new Set<string>();
+    Object.values(patientsByDoctor).forEach((doctorPatients) => {
+        const countWithoutExperiments = Math.random() < 0.5 ? 1 : 2; // 1 or 2 patients
+        for (let i = 0; i < Math.min(countWithoutExperiments, doctorPatients.length); i++) {
+            const randomIndex = Math.floor(Math.random() * doctorPatients.length);
+            patientsWithoutExperiments.add(doctorPatients[randomIndex]);
+        }
+    });
+
     for (const patientId of allPatientIds) {
+        // Skip if this patient should have no experiments
+        if (patientsWithoutExperiments.has(patientId)) {
+            console.log(`  Skipping patient ${patientId.slice(0, 8)} (no experiments)`);
+            continue;
+        }
+
         const experimentCount = Math.floor(Math.random() * 5) + 2; // 2-6 experiments per patient
 
         for (let i = 0; i < experimentCount; i++) {
@@ -112,7 +142,8 @@ async function seedDatabase() {
         }
     }
 
-    console.log(`✅ Created ${totalExperiments} experiments\n`);
+    console.log(`✅ Created ${totalExperiments} experiments`);
+    console.log(`📊 ${patientsWithoutExperiments.size} patients have no experiments\n`);
 
     console.log('\n✨ Database seeding complete!\n');
     console.log('Login credentials for doctors:');
