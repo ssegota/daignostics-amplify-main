@@ -9,8 +9,8 @@ This function:
 5. Returns pre-signed download URL
 
 Dependencies (add to Lambda layer or deployment package):
-- boto3 (included in Lambda)
-- reportlab (for PDF generation)
+- boto3 (included in Lambda runtime)
+- reportlab (for PDF generation - PIL/Pillow NOT required)
 """
 
 import json

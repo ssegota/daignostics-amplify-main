@@ -32,8 +32,10 @@ const ExperimentDetails: React.FC = () => {
     const navigate = useNavigate();
     const { currentDoctor, logout } = useAuth();
     const [experiment, setExperiment] = useState<Experiment | null>(null);
+    const [patientName, setPatientName] = useState<string>('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [generating, setGenerating] = useState(false);
 
     useEffect(() => {
         if (!id) return;
@@ -54,11 +56,82 @@ const ExperimentDetails: React.FC = () => {
                 return;
             }
             setExperiment(data as Experiment);
+
+            // Fetch patient name
+            if (data.patientId) {
+                const { data: patientData } = await client.models.Patient.get({ id: data.patientId });
+                if (patientData) {
+                    setPatientName(`${patientData.firstName} ${patientData.lastName}`);
+                }
+            }
         } catch (err) {
             console.error('Error fetching experiment:', err);
             setError('Failed to load experiment data');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleGenerateReport = async () => {
+        if (!experiment || !currentDoctor) return;
+
+        setGenerating(true);
+        setError('');
+
+        try {
+            const apiUrl = import.meta.env.VITE_REPORT_API_URL;
+
+            if (!apiUrl) {
+                throw new Error('Report API URL not configured. Please set VITE_REPORT_API_URL in .env');
+            }
+
+            // Prepare request payload
+            const payload = {
+                doctorUsername: currentDoctor.username,
+                patientName: patientName || 'Unknown Patient',
+                measurements: {
+                    peakCounts: experiment.peakCounts,
+                    amplitude: experiment.amplitude,
+                    auc: experiment.auc,
+                    fwhm: experiment.fwhm,
+                    frequency: experiment.frequency,
+                    snr: experiment.snr,
+                    skewness: experiment.skewness,
+                    kurtosis: experiment.kurtosis,
+                    generationDate: experiment.generationDate,
+                },
+            };
+
+            console.log('Sending request to Lambda:', apiUrl);
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || `Server error: ${response.status}`);
+            }
+
+            const result = await response.json();
+
+            if (result.success && result.downloadUrl) {
+                // Open download URL in new tab
+                window.open(result.downloadUrl, '_blank');
+                alert('✅ Report generated successfully! Download started.');
+            } else {
+                throw new Error('Invalid response from server');
+            }
+        } catch (err) {
+            console.error('Error generating report:', err);
+            setError(err instanceof Error ? err.message : 'Failed to generate report');
+            alert(`Failed to generate report: ${err instanceof Error ? err.message : 'Unknown error'}`);
+        } finally {
+            setGenerating(false);
         }
     };
 
@@ -211,8 +284,19 @@ const ExperimentDetails: React.FC = () => {
                     </div>
 
                     <div className="mt-lg" style={{ textAlign: 'center' }}>
-                        <button className="btn btn-primary" onClick={() => alert('Report generation coming soon!')}>
-                            📄 Generate Report
+                        <button
+                            className="btn btn-primary"
+                            onClick={handleGenerateReport}
+                            disabled={generating}
+                        >
+                            {generating ? (
+                                <>
+                                    <span className="spinner" style={{ width: '16px', height: '16px', marginRight: '8px' }}></span>
+                                    Generating Report...
+                                </>
+                            ) : (
+                                '📄 Generate Report'
+                            )}
                         </button>
                     </div>
                 </div>
