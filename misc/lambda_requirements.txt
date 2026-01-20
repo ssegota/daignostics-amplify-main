@@ -1,0 +1,4 @@
+# Lambda Deployment Requirements
+# Create a requirements.txt for Lambda layer or deployment package
+
+reportlab==4.0.9

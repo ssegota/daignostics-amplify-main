@@ -1,0 +1,300 @@
+"""
+AWS Lambda function for generating medical reports using Amazon Bedrock and storing in S3.
+
+This function:
+1. Receives experiment measurements, doctor username, and patient name via API Gateway
+2. Sends data to Amazon Bedrock (DeepSeek) for analysis
+3. Generates a formatted PDF report
+4. Saves to S3 bucket
+5. Returns pre-signed download URL
+
+Dependencies (add to Lambda layer or deployment package):
+- boto3 (included in Lambda)
+- reportlab (for PDF generation)
+"""
+
+import json
+import boto3
+import os
+from datetime import datetime, timedelta
+from io import BytesIO
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib import colors
+
+# AWS clients
+bedrock_runtime = boto3.client('bedrock-runtime', region_name='us-east-1')
+s3_client = boto3.client('s3')
+
+# Configuration
+S3_BUCKET = 'daignostics-reports'
+S3_PREFIX = 'test_reports/'
+BEDROCK_MODEL_ID = 'deepseek-r1'  # Adjust based on actual model ID
+
+def lambda_handler(event, context):
+    """
+    Main Lambda handler function.
+    
+    Expected event structure:
+    {
+        "doctorUsername": "drjones",
+        "patientName": "John Doe",
+        "measurements": {
+            "peakCounts": 45.0,
+            "amplitude": 5.23,
+            "auc": 750.5,
+            "fwhm": 2.1,
+            "frequency": 50.3,
+            "snr": 35.8,
+            "skewness": 0.5,
+            "kurtosis": 3.2,
+            "generationDate": "2026-01-15T10:30:00.000Z"
+        }
+    }
+    """
+    try:
+        # Parse request body
+        if isinstance(event.get('body'), str):
+            body = json.loads(event['body'])
+        else:
+            body = event
+        
+        doctor_username = body.get('doctorUsername')
+        patient_name = body.get('patientName')
+        measurements = body.get('measurements')
+        
+        # Validate inputs
+        if not all([doctor_username, patient_name, measurements]):
+            return {
+                'statusCode': 400,
+                'body': json.dumps({'error': 'Missing required fields'})
+            }
+        
+        # Step 1: Get analysis from Amazon Bedrock
+        bedrock_response = get_bedrock_analysis(measurements)
+        
+        # Step 2: Generate PDF report
+        pdf_buffer = generate_pdf_report(
+            doctor_username,
+            patient_name,
+            measurements,
+            bedrock_response
+        )
+        
+        # Step 3: Upload to S3
+        file_name = f"report_{patient_name.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        s3_key = f"{S3_PREFIX}{file_name}"
+        
+        s3_client.put_object(
+            Bucket=S3_BUCKET,
+            Key=s3_key,
+            Body=pdf_buffer.getvalue(),
+            ContentType='application/pdf'
+        )
+        
+        # Step 4: Generate pre-signed URL (valid for 1 hour)
+        download_url = s3_client.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': S3_BUCKET, 'Key': s3_key},
+            ExpiresIn=3600
+        )
+        
+        return {
+            'statusCode': 200,
+            'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            },
+            'body': json.dumps({
+                'success': True,
+                'downloadUrl': download_url,
+                's3Uri': f"s3://{S3_BUCKET}/{s3_key}",
+                'message': 'Report generated successfully'
+            })
+        }
+        
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return {
+            'statusCode': 500,
+            'body': json.dumps({'error': str(e)})
+        }
+
+
+def get_bedrock_analysis(measurements):
+    """
+    Send measurements to Amazon Bedrock (DeepSeek) for analysis.
+    
+    Args:
+        measurements (dict): Dictionary of experiment measurements
+        
+    Returns:
+        str: Analysis text from Bedrock
+    """
+    # Format measurements for prompt
+    measurements_text = "\n".join([
+        f"- {key}: {value}" for key, value in measurements.items()
+    ])
+    
+    prompt = f"""Describe these values: 
+
+{measurements_text}
+
+Please provide a brief medical interpretation of these neurological signal measurements."""
+    
+    # Prepare request for Bedrock
+    request_body = {
+        "prompt": prompt,
+        "max_tokens": 500,
+        "temperature": 0.7,
+        "top_p": 0.9
+    }
+    
+    try:
+        response = bedrock_runtime.invoke_model(
+            modelId=BEDROCK_MODEL_ID,
+            body=json.dumps(request_body),
+            contentType='application/json',
+            accept='application/json'
+        )
+        
+        response_body = json.loads(response['body'].read())
+        
+        # Extract text from response (adjust based on actual DeepSeek response format)
+        analysis = response_body.get('completion', response_body.get('text', 'No analysis generated'))
+        
+        return analysis
+        
+    except Exception as e:
+        print(f"Bedrock error: {str(e)}")
+        return f"[Analysis unavailable: {str(e)}]"
+
+
+def generate_pdf_report(doctor_username, patient_name, measurements, analysis):
+    """
+    Generate a PDF medical report.
+    
+    Args:
+        doctor_username (str): Doctor's username
+        patient_name (str): Patient's full name
+        measurements (dict): Experiment measurements
+        analysis (str): Bedrock analysis text
+        
+    Returns:
+        BytesIO: PDF file buffer
+    """
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    story = []
+    styles = getSampleStyleSheet()
+    
+    # Custom styles
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=24,
+        textColor=colors.HexColor('#E31E24'),
+        spaceAfter=30,
+        alignment=1  # Center
+    )
+    
+    heading_style = ParagraphStyle(
+        'CustomHeading',
+        parent=styles['Heading2'],
+        fontSize=14,
+        textColor=colors.HexColor('#E31E24'),
+        spaceAfter=12
+    )
+    
+    # Title
+    story.append(Paragraph("dAIgnostics", title_style))
+    story.append(Paragraph("Neurological Analysis Report", styles['Heading2']))
+    story.append(Spacer(1, 0.3 * inch))
+    
+    # Report metadata
+    report_date = datetime.now().strftime("%B %d, %Y at %I:%M %p")
+    story.append(Paragraph(f"<b>Report Date:</b> {report_date}", styles['Normal']))
+    story.append(Paragraph(f"<b>Physician:</b> Dr. {doctor_username}", styles['Normal']))
+    story.append(Paragraph(f"<b>Patient:</b> {patient_name}", styles['Normal']))
+    story.append(Spacer(1, 0.3 * inch))
+    
+    # Experiment measurements
+    story.append(Paragraph("Measurement Results", heading_style))
+    
+    measurement_labels = {
+        'peakCounts': ('Peak Counts', ''),
+        'amplitude': ('Amplitude', 'mV'),
+        'auc': ('Area Under Curve', ''),
+        'fwhm': ('FWHM', 'ms'),
+        'frequency': ('Frequency', 'Hz'),
+        'snr': ('Signal-to-Noise Ratio', 'dB'),
+        'skewness': ('Skewness', ''),
+        'kurtosis': ('Kurtosis', ''),
+        'generationDate': ('Test Date', '')
+    }
+    
+    table_data = [['Measurement', 'Value', 'Unit']]
+    for key, value in measurements.items():
+        label, unit = measurement_labels.get(key, (key, ''))
+        if key == 'generationDate':
+            formatted_value = datetime.fromisoformat(value.replace('Z', '+00:00')).strftime('%Y-%m-%d %H:%M')
+        else:
+            formatted_value = f"{float(value):.2f}" if isinstance(value, (int, float)) else str(value)
+        table_data.append([label, formatted_value, unit])
+    
+    table = Table(table_data, colWidths=[3*inch, 1.5*inch, 1*inch])
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#E31E24')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+    
+    story.append(table)
+    story.append(Spacer(1, 0.3 * inch))
+    
+    # AI Analysis
+    story.append(Paragraph("Clinical Interpretation", heading_style))
+    story.append(Paragraph(analysis, styles['Normal']))
+    story.append(Spacer(1, 0.5 * inch))
+    
+    # Footer
+    story.append(Paragraph(
+        "<i>This report was generated using AI-assisted analysis and should be reviewed by a qualified medical professional.</i>",
+        styles['Italic']
+    ))
+    
+    # Build PDF
+    doc.build(story)
+    buffer.seek(0)
+    
+    return buffer
+
+
+# Example test event for local testing
+if __name__ == "__main__":
+    test_event = {
+        "doctorUsername": "drjones",
+        "patientName": "John Doe",
+        "measurements": {
+            "peakCounts": 45.0,
+            "amplitude": 5.23,
+            "auc": 750.5,
+            "fwhm": 2.1,
+            "frequency": 50.3,
+            "snr": 35.8,
+            "skewness": 0.5,
+            "kurtosis": 3.2,
+            "generationDate": "2026-01-15T10:30:00.000Z"
+        }
+    }
+    
+    result = lambda_handler(test_event, None)
+    print(json.dumps(result, indent=2))
