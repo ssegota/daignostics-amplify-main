@@ -16,6 +16,21 @@ const schema = a.schema({
             doctor: a.string().required(),
         })
         .authorization((allow) => [allow.publicApiKey()]),
+
+    Experiment: a
+        .model({
+            patientId: a.string().required(),
+            peakCounts: a.float().required(),
+            amplitude: a.float().required(),
+            auc: a.float().required(),
+            fwhm: a.float().required(),
+            frequency: a.float().required(),
+            snr: a.float().required(),
+            skewness: a.float().required(),
+            kurtosis: a.float().required(),
+            generationDate: a.datetime().required(),
+        })
+        .authorization((allow) => [allow.publicApiKey()]),
 });
 
 export type Schema = ClientSchema<typeof schema>;

@@ -29,6 +29,29 @@ function getRandomElement<T>(array: T[]): T {
     return array[Math.floor(Math.random() * array.length)];
 }
 
+function randomFloat(min: number, max: number): number {
+    return Math.random() * (max - min) + min;
+}
+
+function generateExperiment(patientId: string) {
+    const now = new Date();
+    const daysAgo = Math.floor(Math.random() * 180); // Random date within last 6 months
+    const experimentDate = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000);
+
+    return {
+        patientId,
+        peakCounts: Math.floor(randomFloat(10, 100)),
+        amplitude: randomFloat(0.5, 10.0),
+        auc: randomFloat(100, 1000),
+        fwhm: randomFloat(0.1, 5.0),
+        frequency: randomFloat(1, 100),
+        snr: randomFloat(5, 50),
+        skewness: randomFloat(-2, 2),
+        kurtosis: randomFloat(1, 10),
+        generationDate: experimentDate.toISOString(),
+    };
+}
+
 async function seedDatabase() {
     console.log('🌱 Starting database seeding...\n');
 
@@ -43,7 +66,9 @@ async function seedDatabase() {
         }
     }
 
-    console.log('\nCreating patients...');
+    console.log('\nCreating patients and experiments...');
+
+    const allPatientIds: string[] = [];
 
     // Create patients for each doctor
     for (const doctor of doctors) {
@@ -57,13 +82,37 @@ async function seedDatabase() {
             };
 
             try {
-                await client.models.Patient.create(patient);
+                const created = await client.models.Patient.create(patient);
                 console.log(`✅ Created patient: ${patient.firstName} ${patient.lastName} for ${doctor.username}`);
+
+                if (created.data?.id) {
+                    allPatientIds.push(created.data.id);
+                }
             } catch (error) {
                 console.error(`❌ Error creating patient:`, error);
             }
         }
     }
+
+    console.log('\nCreating experiments for patients...');
+
+    let totalExperiments = 0;
+    for (const patientId of allPatientIds) {
+        const experimentCount = Math.floor(Math.random() * 5) + 2; // 2-6 experiments per patient
+
+        for (let i = 0; i < experimentCount; i++) {
+            const experiment = generateExperiment(patientId);
+
+            try {
+                await client.models.Experiment.create(experiment);
+                totalExperiments++;
+            } catch (error) {
+                console.error(`❌ Error creating experiment for patient ${patientId}:`, error);
+            }
+        }
+    }
+
+    console.log(`✅ Created ${totalExperiments} experiments\n`);
 
     console.log('\n✨ Database seeding complete!\n');
     console.log('Login credentials for doctors:');

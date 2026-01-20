@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { generateClient } from 'aws-amplify/data';
 import type { Schema } from '../../amplify/data/resource';
 import { useAuth } from '../AuthContext';
@@ -14,6 +15,7 @@ interface Patient {
 
 const PatientList: React.FC = () => {
     const { currentDoctor, logout } = useAuth();
+    const navigate = useNavigate();
     const [patients, setPatients] = useState<Patient[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -87,7 +89,12 @@ const PatientList: React.FC = () => {
                     ) : (
                         <div className="patient-grid">
                             {patients.map((patient) => (
-                                <div key={patient.id} className="patient-card">
+                                <div
+                                    key={patient.id}
+                                    className="patient-card"
+                                    onClick={() => navigate(`/patient/${patient.id}`)}
+                                    style={{ cursor: 'pointer' }}
+                                >
                                     <div className="patient-name">
                                         {patient.firstName} {patient.lastName}
                                     </div>
