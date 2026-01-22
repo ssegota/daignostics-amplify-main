@@ -16,6 +16,7 @@ Dependencies (add to Lambda layer):
 import json
 import boto3
 import os
+import base64
 from datetime import datetime, timedelta
 from io import BytesIO
 from reportlab.lib.pagesizes import letter
@@ -27,6 +28,7 @@ from reportlab.lib import colors
 # AWS clients
 bedrock_runtime = boto3.client('bedrock-runtime', region_name='us-east-1')
 s3_client = boto3.client('s3')
+polly_client = boto3.client('polly', region_name='eu-north-1')
 
 # Configuration
 S3_BUCKET = os.environ.get('S3_BUCKET', 'daignostics-reports')
@@ -36,27 +38,20 @@ BEDROCK_MODEL_ID = 'us.anthropic.claude-3-haiku-20240307-v1:0'  # Claude 3 Haiku
 def lambda_handler(event, context):
     """
     Main Lambda handler function.
+    Handles both report generation and text-to-speech requests.
     
-    Expected event structure (direct invocation):
+    Expected event structure for report generation:
     {
+        "action": "generate_report",  // optional, default action
         "doctorUsername": "drjones",
         "patientName": "John Doe",
-        "measurements": {
-            "peakCounts": 45.0,
-            "amplitude": 5.23,
-            "auc": 750.5,
-            "fwhm": 2.1,
-            "frequency": 50.3,
-            "snr": 35.8,
-            "skewness": 0.5,
-            "kurtosis": 3.2,
-            "generationDate": "2026-01-15T10:30:00.000Z"
-        }
+        "measurements": {...}
     }
     
-    Or via API Gateway (body as string):
+    Expected event structure for TTS:
     {
-        "body": "{\"doctorUsername\":...}"
+        "action": "text_to_speech",
+        "text": "Text to convert to speech"
     }
     """
     try:
@@ -66,20 +61,115 @@ def lambda_handler(event, context):
         else:
             body = event
         
-        doctor_username = body.get('doctorUsername')
-        patient_name = body.get('patientName')
-        measurements = body.get('measurements')
+        # Route based on action
+        action = body.get('action', 'generate_report')
         
-        # Validate inputs
-        if not all([doctor_username, patient_name, measurements]):
-            return {
-                'statusCode': 400,
-                'headers': {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*'
-                },
-                'body': json.dumps({'error': 'Missing required fields: doctorUsername, patientName, or measurements'})
-            }
+        if action == 'text_to_speech':
+            return handle_text_to_speech(body)
+        else:
+            return handle_report_generation(body)
+            
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return {
+            'statusCode': 500,
+            'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            },
+            'body': json.dumps({'error': str(e)})
+        }
+
+
+def handle_text_to_speech(body):
+    """
+    Convert text to speech using Amazon Polly Neural voices.
+    
+    Args:
+        body (dict): Request body containing 'text' field
+        
+    Returns:
+        dict: Response with base64-encoded audio
+    """
+    text = body.get('text')
+    
+    if not text:
+        return {
+            'statusCode': 400,
+            'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            },
+            'body': json.dumps({'error': 'Missing required field: text'})
+        }
+    
+    try:
+        # Synthesize speech using Polly Neural voice
+        response = polly_client.synthesize_speech(
+            Text=text,
+            OutputFormat='mp3',
+            VoiceId='Joanna',  # Neural voice - professional female voice
+            Engine='neural',    # Use neural engine for highest quality
+            TextType='text'
+        )
+        
+        # Read audio stream
+        audio_data = response['AudioStream'].read()
+        
+        # Encode to base64 for transmission
+        audio_base64 = base64.b64encode(audio_data).decode('utf-8')
+        
+        return {
+            'statusCode': 200,
+            'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            },
+            'body': json.dumps({
+                'success': True,
+                'audio': audio_base64,
+                'format': 'mp3'
+            })
+        }
+        
+    except Exception as e:
+        print(f"Polly TTS error: {str(e)}")
+        return {
+            'statusCode': 500,
+            'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            },
+            'body': json.dumps({'error': f'TTS generation failed: {str(e)}'})
+        }
+
+
+def handle_report_generation(body):
+    """
+    Generate medical report with Bedrock analysis.
+    
+    Args:
+        body (dict): Request body with doctor, patient, and measurements
+        
+    Returns:
+        dict: Response with download URL and analysis
+    """
+    doctor_username = body.get('doctorUsername')
+    patient_name = body.get('patientName')
+    measurements = body.get('measurements')
+    
+    # Validate inputs
+    if not all([doctor_username, patient_name, measurements]):
+        return {
+            'statusCode': 400,
+            'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            },
+            'body': json.dumps({'error': 'Missing required fields: doctorUsername, patientName, or measurements'})
+        }
         
         # Step 1: Get analysis from Amazon Bedrock
         bedrock_response = get_bedrock_analysis(measurements)

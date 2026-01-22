@@ -45,10 +45,14 @@ const ExperimentDetails: React.FC = () => {
         fetchExperiment();
     }, [id]);
 
-    // Cleanup effect: stop speech when modal closes
+    // Cleanup effect: stop audio when modal closes
     useEffect(() => {
         if (!showPreview && isSpeaking) {
-            window.speechSynthesis.cancel();
+            const audioElement = document.getElementById('polly-audio') as HTMLAudioElement;
+            if (audioElement) {
+                audioElement.pause();
+                audioElement.currentTime = 0;
+            }
             setIsSpeaking(false);
         }
     }, [showPreview, isSpeaking]);
@@ -150,38 +154,81 @@ const ExperimentDetails: React.FC = () => {
         }
     };
 
-    const handleTextToSpeech = () => {
+    const handleTextToSpeech = async () => {
         if (!reportData?.analysis) return;
-
-        // Check if browser supports speech synthesis
-        if (!('speechSynthesis' in window)) {
-            alert('Text-to-speech is not supported in your browser.');
-            return;
-        }
 
         // If already speaking, stop it
         if (isSpeaking) {
-            window.speechSynthesis.cancel();
+            // Stop current audio playback
+            const audioElement = document.getElementById('polly-audio') as HTMLAudioElement;
+            if (audioElement) {
+                audioElement.pause();
+                audioElement.currentTime = 0;
+            }
             setIsSpeaking(false);
             return;
         }
 
-        // Create utterance
-        const utterance = new SpeechSynthesisUtterance(reportData.analysis);
-        utterance.lang = 'en-US';
-        utterance.rate = 0.9; // Slightly slower for medical content
-        utterance.pitch = 1.0;
+        try {
+            setIsSpeaking(true);
 
-        // Handle events
-        utterance.onstart = () => setIsSpeaking(true);
-        utterance.onend = () => setIsSpeaking(false);
-        utterance.onerror = () => {
+            // Call Lambda TTS endpoint
+            const apiUrl = import.meta.env.VITE_REPORT_API_URL;
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    action: 'text_to_speech',
+                    text: reportData.analysis
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to generate speech');
+            }
+
+            const result = await response.json();
+
+            if (result.success && result.audio) {
+                // Decode base64 audio
+                const audioData = atob(result.audio);
+                const audioArray = new Uint8Array(audioData.length);
+                for (let i = 0; i < audioData.length; i++) {
+                    audioArray[i] = audioData.charCodeAt(i);
+                }
+                const audioBlob = new Blob([audioArray], { type: 'audio/mpeg' });
+                const audioUrl = URL.createObjectURL(audioBlob);
+
+                // Create and play audio element
+                let audioElement = document.getElementById('polly-audio') as HTMLAudioElement;
+                if (!audioElement) {
+                    audioElement = document.createElement('audio');
+                    audioElement.id = 'polly-audio';
+                    document.body.appendChild(audioElement);
+                }
+
+                audioElement.src = audioUrl;
+                audioElement.onended = () => {
+                    setIsSpeaking(false);
+                    URL.revokeObjectURL(audioUrl);
+                };
+                audioElement.onerror = () => {
+                    setIsSpeaking(false);
+                    alert('Error playing audio');
+                };
+
+                await audioElement.play();
+            } else {
+                throw new Error('Invalid response from TTS service');
+            }
+        } catch (error) {
+            console.error('TTS error:', error);
             setIsSpeaking(false);
-            alert('An error occurred while reading the text.');
-        };
-
-        // Speak
-        window.speechSynthesis.speak(utterance);
+            alert('Failed to generate speech. Please try again.');
+        }
     };
 
     const getMetrics = (): MetricInfo[] => {
