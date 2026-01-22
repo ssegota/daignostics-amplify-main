@@ -165,6 +165,10 @@ const ExperimentDetails: React.FC = () => {
                 audioElement.pause();
                 audioElement.currentTime = 0;
             }
+            // Also cancel Web Speech API if it's running
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+            }
             setIsSpeaking(false);
             return;
         }
@@ -217,7 +221,8 @@ const ExperimentDetails: React.FC = () => {
                 };
                 audioElement.onerror = () => {
                     setIsSpeaking(false);
-                    alert('Error playing audio');
+                    console.error('Audio playback error, trying fallback...');
+                    fallbackToWebSpeech();
                 };
 
                 await audioElement.play();
@@ -225,9 +230,40 @@ const ExperimentDetails: React.FC = () => {
                 throw new Error('Invalid response from TTS service');
             }
         } catch (error) {
-            console.error('TTS error:', error);
+            console.log('Polly TTS failed, falling back to Web Speech API:', error);
+            fallbackToWebSpeech();
+        }
+    };
+
+    const fallbackToWebSpeech = () => {
+        if (!reportData?.analysis) return;
+
+        // Check if browser supports speech synthesis
+        if (!('speechSynthesis' in window)) {
             setIsSpeaking(false);
-            alert('Failed to generate speech. Please try again.');
+            alert('Text-to-speech is not available.');
+            return;
+        }
+
+        try {
+            // Create utterance with Web Speech API
+            const utterance = new SpeechSynthesisUtterance(reportData.analysis);
+            utterance.lang = 'en-US';
+            utterance.rate = 0.9;
+            utterance.pitch = 1.0;
+
+            utterance.onstart = () => setIsSpeaking(true);
+            utterance.onend = () => setIsSpeaking(false);
+            utterance.onerror = () => {
+                setIsSpeaking(false);
+                alert('Text-to-speech failed.');
+            };
+
+            window.speechSynthesis.speak(utterance);
+        } catch (error) {
+            console.error('Web Speech API error:', error);
+            setIsSpeaking(false);
+            alert('Text-to-speech failed.');
         }
     };
 
