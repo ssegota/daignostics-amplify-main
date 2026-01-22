@@ -170,7 +170,8 @@ def handle_report_generation(body):
             },
             'body': json.dumps({'error': 'Missing required fields: doctorUsername, patientName, or measurements'})
         }
-        
+    
+    try:
         # Step 1: Get analysis from Amazon Bedrock
         bedrock_response = get_bedrock_analysis(measurements)
         
