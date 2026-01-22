@@ -38,11 +38,20 @@ const ExperimentDetails: React.FC = () => {
     const [generating, setGenerating] = useState(false);
     const [showPreview, setShowPreview] = useState(false);
     const [reportData, setReportData] = useState<{ analysis: string; downloadUrl: string; fileName: string } | null>(null);
+    const [isSpeaking, setIsSpeaking] = useState(false);
 
     useEffect(() => {
         if (!id) return;
         fetchExperiment();
     }, [id]);
+
+    // Cleanup effect: stop speech when modal closes
+    useEffect(() => {
+        if (!showPreview && isSpeaking) {
+            window.speechSynthesis.cancel();
+            setIsSpeaking(false);
+        }
+    }, [showPreview, isSpeaking]);
 
     const fetchExperiment = async () => {
         if (!id) return;
@@ -139,6 +148,40 @@ const ExperimentDetails: React.FC = () => {
         } finally {
             setGenerating(false);
         }
+    };
+
+    const handleTextToSpeech = () => {
+        if (!reportData?.analysis) return;
+
+        // Check if browser supports speech synthesis
+        if (!('speechSynthesis' in window)) {
+            alert('Text-to-speech is not supported in your browser.');
+            return;
+        }
+
+        // If already speaking, stop it
+        if (isSpeaking) {
+            window.speechSynthesis.cancel();
+            setIsSpeaking(false);
+            return;
+        }
+
+        // Create utterance
+        const utterance = new SpeechSynthesisUtterance(reportData.analysis);
+        utterance.lang = 'en-US';
+        utterance.rate = 0.9; // Slightly slower for medical content
+        utterance.pitch = 1.0;
+
+        // Handle events
+        utterance.onstart = () => setIsSpeaking(true);
+        utterance.onend = () => setIsSpeaking(false);
+        utterance.onerror = () => {
+            setIsSpeaking(false);
+            alert('An error occurred while reading the text.');
+        };
+
+        // Speak
+        window.speechSynthesis.speak(utterance);
     };
 
     const getMetrics = (): MetricInfo[] => {
@@ -329,6 +372,13 @@ const ExperimentDetails: React.FC = () => {
                                 <div className="modal-footer">
                                     <button className="btn btn-secondary" onClick={() => setShowPreview(false)}>
                                         Close
+                                    </button>
+                                    <button
+                                        className="btn btn-primary"
+                                        onClick={handleTextToSpeech}
+                                        style={{ marginRight: 'auto' }}
+                                    >
+                                        {isSpeaking ? '⏸️ Stop' : '▶️ Play'}
                                     </button>
                                     <button
                                         className="btn btn-primary"
