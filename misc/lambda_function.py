@@ -142,40 +142,42 @@ def lambda_handler(event, context):
 
 def get_bedrock_analysis(measurements):
     """
-    Send measurements to Amazon Bedrock (Claude) for AI analysis.
+    Send measurements to Amazon Bedrock (Claude) for AI analysis with ALS-specific context.
     
     Args:
-        measurements (dict): Dictionary of experiment measurements
+        measurements (dict): Dictionary of Ca²⁺ imaging measurements
         
     Returns:
-        str: Analysis text from Claude
+        str: Clinical analysis text from Claude
     """
-    # Format measurements for prompt
+    # Format measurements for context
     measurements_text = "\n".join([
         f"- {key}: {value}" for key, value in measurements.items()
         if key != 'generationDate'
     ])
     
-    prompt = f"""Analyze these neurological signal measurements:
-
-{measurements_text}
-
-Please provide a brief medical interpretation focusing on:
-1. What these values indicate about neurological function
-2. Any notable patterns or concerns
-3. General assessment
-
-Keep the response concise (3-4 sentences)."""
+    # Build ALS-specific context prompt
+    context = (
+        "Context: Astrocytes treated with sporadic ALS patient IgG exhibit three Ca²⁺ transient patterns:\n\n"
+        "• Single: solitary, rapid transient (time_to_peak ≈ 20 s), driven by ER IP₃R release with minimal extracellular Ca²⁺ involvement.\n"
+        "• Bursting: high-frequency repetitive transients (dominant_freq ≈ 0.11 Hz; intervals ≈ 9 s), reflecting cycles of ER release and partial store‐operated Ca²⁺ entry.\n"
+        "• Repetitive: isolated transients (>20 s apart), consistent with episodic IP₃ production and delayed ER refill.\n\n"
+        "Classification is based on event count, inter‐event interval, and dominant frequency within the first 50 s post‐onset.\n\n"
+        "Please generate a medical‐style report (findings, interpretation, and brief diagnostic comment). "
+        "Be concise and give final judgement if the patient has possibility of ALS.\n\n"
+        f"Metrics:\n{measurements_text}"
+    )
     
     # Prepare request for Bedrock (Anthropic Messages API format)
     request_body = {
         "anthropic_version": "bedrock-2023-05-31",
-        "max_tokens": 500,
+        "max_tokens": 1000,
         "temperature": 0.7,
+        "system": "You are a clinical laboratory specialist report system. Write concise, formal medical reports of Ca²⁺ imaging findings in astrocytes.",
         "messages": [
             {
                 "role": "user",
-                "content": prompt
+                "content": context
             }
         ]
     }
