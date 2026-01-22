@@ -28,7 +28,7 @@ from reportlab.lib import colors
 # AWS clients
 bedrock_runtime = boto3.client('bedrock-runtime', region_name='us-east-1')
 s3_client = boto3.client('s3')
-polly_client = boto3.client('polly', region_name='eu-north-1')
+polly_client = boto3.client('polly', region_name='us-east-1')  # Neural voices supported in us-east-1
 
 # Configuration
 S3_BUCKET = os.environ.get('S3_BUCKET', 'daignostics-reports')
