@@ -16,7 +16,10 @@ const CSVUpload: React.FC<CSVUploadProps> = ({ patientId, onUploadComplete }) =>
     const inputRef = useRef<HTMLInputElement>(null);
 
     const parseCSV = (text: string): any | null => {
-        const lines = text.trim().split('\n');
+        // Remove Byte Order Mark (BOM) if present
+        const cleanText = text.replace(/^\uFEFF/, '');
+        const lines = cleanText.trim().split('\n');
+
         if (lines.length < 2) {
             setError('CSV must have at least 2 rows (header and data)');
             return null;
@@ -26,11 +29,12 @@ const CSVUpload: React.FC<CSVUploadProps> = ({ patientId, onUploadComplete }) =>
         const values = lines[1].split(',').map(v => v.trim());
 
         if (headers.length !== values.length) {
-            setError('Header and data row must have the same number of columns');
+            setError(`Header count (${headers.length}) does not match value count (${values.length})`);
             return null;
         }
 
         const data: any = { patientId };
+        let hasValidField = false;
 
         for (let i = 0; i < headers.length; i++) {
             const header = headers[i];
@@ -39,9 +43,19 @@ const CSVUpload: React.FC<CSVUploadProps> = ({ patientId, onUploadComplete }) =>
             // Convert to appropriate types
             if (header === 'generationDate') {
                 data[header] = value;
+                hasValidField = true;
             } else if (['peakCounts', 'amplitude', 'auc', 'fwhm', 'frequency', 'snr', 'skewness', 'kurtosis'].includes(header)) {
-                data[header] = parseFloat(value);
+                const numVal = parseFloat(value);
+                if (!isNaN(numVal)) {
+                    data[header] = numVal;
+                    hasValidField = true;
+                }
             }
+        }
+
+        if (!hasValidField) {
+            setError('No valid fields found in CSV. Check headers.');
+            return null;
         }
 
         return data;
