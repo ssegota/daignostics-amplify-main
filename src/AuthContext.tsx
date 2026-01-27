@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import { getCurrentUser, signIn, signOut, type SignInInput } from 'aws-amplify/auth';
+import { getCurrentUser, signIn, signOut, fetchUserAttributes, type SignInInput } from 'aws-amplify/auth';
 
 import { generateClient } from 'aws-amplify/data';
 import type { Schema } from '../amplify/data/resource';
@@ -23,30 +23,40 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         checkUser();
     }, []);
 
-    const determineRole = async (username: string): Promise<'doctor' | 'patient' | 'unknown'> => {
+    const determineRole = async (username: string, email?: string): Promise<'doctor' | 'patient' | 'unknown'> => {
+        console.log('determineRole called with username:', username, 'email:', email);
+
         try {
-            // Check if Doctor
-            // Doctor might not use 'username' as PK in the generated client if id is auto-generated
-            // So we use list with filter to be safe
+            // Check if Doctor by username
             const doctorCheck = await client.models.Doctor.list({ filter: { username: { eq: username } } });
+            console.log('Doctor check by username:', doctorCheck.data.length);
             if (doctorCheck.data.length > 0) return 'doctor';
 
             // Also check by email for doctors
-            const doctorEmailCheck = await client.models.Doctor.list({ filter: { email: { eq: username } } });
-            if (doctorEmailCheck.data.length > 0) return 'doctor';
+            if (email) {
+                const doctorEmailCheck = await client.models.Doctor.list({ filter: { email: { eq: email } } });
+                console.log('Doctor check by email:', doctorEmailCheck.data.length);
+                if (doctorEmailCheck.data.length > 0) return 'doctor';
+            }
         } catch (e) {
+            console.log('Doctor check error:', e);
             // Ignore (might not be a doctor)
         }
 
         try {
-            // Check if Patient by cognitoId (might be Cognito sub or email)
+            // Check if Patient by cognitoId
             const patientCheck = await client.models.Patient.list({ filter: { cognitoId: { eq: username } } });
+            console.log('Patient check by cognitoId:', patientCheck.data.length);
             if (patientCheck.data.length > 0) return 'patient';
 
-            // Also check by email for patients (since cognitoId is set to email during creation)
-            const patientEmailCheck = await client.models.Patient.list({ filter: { email: { eq: username } } });
-            if (patientEmailCheck.data.length > 0) return 'patient';
+            // Check by email for patients (since cognitoId is set to email during creation)
+            if (email) {
+                const patientEmailCheck = await client.models.Patient.list({ filter: { email: { eq: email } } });
+                console.log('Patient check by email:', patientEmailCheck.data.length);
+                if (patientEmailCheck.data.length > 0) return 'patient';
+            }
         } catch (e) {
+            console.log('Patient check error:', e);
             // Ignore
         }
 
@@ -56,7 +66,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const checkUser = async () => {
         try {
             const user = await getCurrentUser();
-            const role = await determineRole(user.username);
+            // Fetch user attributes to get email
+            const attributes = await fetchUserAttributes();
+            const email = attributes.email;
+            console.log('checkUser - username:', user.username, 'email:', email);
+
+            const role = await determineRole(user.username, email);
             setCurrentUser({
                 username: user.username,
                 role
@@ -72,7 +87,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const { isSignedIn, nextStep } = await signIn(input);
         if (isSignedIn) {
             const user = await getCurrentUser();
-            const role = await determineRole(user.username);
+            // Fetch user attributes to get email
+            const attributes = await fetchUserAttributes();
+            const email = attributes.email;
+            console.log('login - username:', user.username, 'email:', email);
+
+            const role = await determineRole(user.username, email);
             setCurrentUser({ username: user.username, role });
         } else {
             console.log('Next step required:', nextStep);
