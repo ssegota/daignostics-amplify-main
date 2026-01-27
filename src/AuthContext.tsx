@@ -30,15 +30,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             // So we use list with filter to be safe
             const doctorCheck = await client.models.Doctor.list({ filter: { username: { eq: username } } });
             if (doctorCheck.data.length > 0) return 'doctor';
+
+            // Also check by email for doctors
+            const doctorEmailCheck = await client.models.Doctor.list({ filter: { email: { eq: username } } });
+            if (doctorEmailCheck.data.length > 0) return 'doctor';
         } catch (e) {
             // Ignore (might not be a doctor)
         }
 
         try {
-            // Check if Patient
-            // Patient primary key is 'id', so we filter by cognitoId
+            // Check if Patient by cognitoId (might be Cognito sub or email)
             const patientCheck = await client.models.Patient.list({ filter: { cognitoId: { eq: username } } });
             if (patientCheck.data.length > 0) return 'patient';
+
+            // Also check by email for patients (since cognitoId is set to email during creation)
+            const patientEmailCheck = await client.models.Patient.list({ filter: { email: { eq: username } } });
+            if (patientEmailCheck.data.length > 0) return 'patient';
         } catch (e) {
             // Ignore
         }
