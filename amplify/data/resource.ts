@@ -25,8 +25,6 @@ const schema = a.schema({
             dateOfBirth: a.string(),
             gender: a.string(),
             insuranceNumber: a.string(),
-            height: a.float(),
-            weight: a.float(),
         })
         .authorization((allow) => [
             allow.owner(), // Doctor (creator) has full access

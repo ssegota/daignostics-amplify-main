@@ -29,8 +29,6 @@ interface Patient {
     doctor: string;
     dateOfBirth?: string;
     insuranceNumber?: string;
-    height?: number;
-    weight?: number;
     cognitoId?: string;
 }
 
@@ -57,8 +55,6 @@ const PatientDetails: React.FC = () => {
         lastName: '',
         dateOfBirth: '',
         insuranceNumber: '',
-        height: '',
-        weight: '',
     });
 
     useEffect(() => {
@@ -102,8 +98,6 @@ const PatientDetails: React.FC = () => {
             lastName: patient.lastName,
             dateOfBirth: patient.dateOfBirth || '',
             insuranceNumber: patient.insuranceNumber || '',
-            height: patient.height?.toString() || '',
-            weight: patient.weight?.toString() || '',
         });
         setShowEditModal(true);
     };
@@ -120,8 +114,6 @@ const PatientDetails: React.FC = () => {
                 lastName: editForm.lastName,
                 dateOfBirth: editForm.dateOfBirth,
                 insuranceNumber: editForm.insuranceNumber,
-                height: parseFloat(editForm.height),
-                weight: parseFloat(editForm.weight),
             });
 
             if (data) {
@@ -221,9 +213,7 @@ const PatientDetails: React.FC = () => {
                                 {patient.dateOfBirth && (
                                     <p style={{ color: 'var(--dark-gray)', marginTop: 'var(--spacing-xs)' }}>
                                         DOB: {new Date(patient.dateOfBirth).toLocaleDateString()} |
-                                        Insurance: {patient.insuranceNumber || 'N/A'} |
-                                        Height: {patient.height || '-'} cm |
-                                        Weight: {patient.weight || '-'} kg
+                                        Insurance: {patient.insuranceNumber || 'N/A'}
                                     </p>
                                 )}
                             </div>
@@ -319,26 +309,6 @@ const PatientDetails: React.FC = () => {
                                         value={editForm.insuranceNumber}
                                         onChange={(e) => setEditForm({ ...editForm, insuranceNumber: e.target.value })}
                                     />
-                                </div>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                                    <div className="form-group">
-                                        <label>Height (cm)</label>
-                                        <input
-                                            type="number"
-                                            step="0.1"
-                                            value={editForm.height}
-                                            onChange={(e) => setEditForm({ ...editForm, height: e.target.value })}
-                                        />
-                                    </div>
-                                    <div className="form-group">
-                                        <label>Weight (kg)</label>
-                                        <input
-                                            type="number"
-                                            step="0.1"
-                                            value={editForm.weight}
-                                            onChange={(e) => setEditForm({ ...editForm, weight: e.target.value })}
-                                        />
-                                    </div>
                                 </div>
                             </div>
                             <div className="modal-footer">

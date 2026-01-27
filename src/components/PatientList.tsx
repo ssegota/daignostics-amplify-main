@@ -15,8 +15,6 @@ interface Patient {
     dateOfBirth?: string;
     gender?: string;
     insuranceNumber?: string;
-    height?: number;
-    weight?: number;
     email?: string;
     cognitoId?: string;
 }
@@ -58,8 +56,6 @@ const PatientList: React.FC = () => {
         dateOfBirth: '',
         gender: '',
         insuranceNumber: '',
-        height: '',
-        weight: '',
     });
 
     useEffect(() => {
@@ -230,8 +226,6 @@ const PatientList: React.FC = () => {
                 dateOfBirth: newPatient.dateOfBirth,
                 gender: newPatient.gender || undefined,
                 insuranceNumber: newPatient.insuranceNumber,
-                height: parseFloat(newPatient.height),
-                weight: parseFloat(newPatient.weight),
                 email: newPatient.email,
                 cognitoId: cognitoResult.cognitoSub || cognitoResult.username, // Use Cognito sub for proper authorization
             });
@@ -257,8 +251,6 @@ const PatientList: React.FC = () => {
                     dateOfBirth: '',
                     gender: '',
                     insuranceNumber: '',
-                    height: '',
-                    weight: '',
                 });
             }
         } catch (err) {
@@ -562,28 +554,6 @@ const PatientList: React.FC = () => {
                                         value={newPatient.insuranceNumber}
                                         onChange={(e) => setNewPatient({ ...newPatient, insuranceNumber: e.target.value })}
                                     />
-                                </div>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                                    <div className="form-group">
-                                        <label>Height (cm)</label>
-                                        <input
-                                            type="number"
-                                            step="0.1"
-                                            required
-                                            value={newPatient.height}
-                                            onChange={(e) => setNewPatient({ ...newPatient, height: e.target.value })}
-                                        />
-                                    </div>
-                                    <div className="form-group">
-                                        <label>Weight (kg)</label>
-                                        <input
-                                            type="number"
-                                            step="0.1"
-                                            required
-                                            value={newPatient.weight}
-                                            onChange={(e) => setNewPatient({ ...newPatient, weight: e.target.value })}
-                                        />
-                                    </div>
                                 </div>
                             </div>
                             <div className="modal-footer">
