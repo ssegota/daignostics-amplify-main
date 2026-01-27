@@ -282,7 +282,7 @@ async function seedDatabase() {
 
         // 5. Create Patients & Experiments
         console.log(`👥 Creating Patients & Experiments...`);
-        const patientCount = Math.floor(Math.random() * 6) + 3; // 3-8 patients
+        const patientCount = Math.floor(Math.random() * 6) + 15; // 15-20 patients
 
         for (let i = 0; i < patientCount; i++) {
             const pFirstName = getRandomElement(firstNames);
@@ -310,21 +310,17 @@ async function seedDatabase() {
                 dateOfBirth: randomDate(new Date(1950, 0, 1), new Date(2005, 0, 1)),
                 gender: getRandomElement(['Male', 'Female']),
                 insuranceNumber: randomString(10),
-                height: parseFloat(randomFloat(150, 200).toFixed(1)),
-                weight: parseFloat(randomFloat(50, 120).toFixed(1)),
             };
 
             const newPatient = await client.models.Patient.create(patientData);
 
             if (newPatient.data) {
-                // Create experiments for this patient (unless random skip)
-                if (Math.random() > 0.2) { // 80% chance of having experiments
-                    const experimentCount = Math.floor(Math.random() * 5) + 2;
-                    for (let j = 0; j < experimentCount; j++) {
-                        const expData = generateExperiment(newPatient.data.id);
-                        expData.patientCognitoId = patientSub; // Grant access to patient
-                        await client.models.Experiment.create(expData);
-                    }
+                // Create experiments for this patient (0-5 experiments)
+                const experimentCount = Math.floor(Math.random() * 6); // 0-5 experiments
+                for (let j = 0; j < experimentCount; j++) {
+                    const expData = generateExperiment(newPatient.data.id);
+                    expData.patientCognitoId = patientSub; // Grant access to patient
+                    await client.models.Experiment.create(expData);
                 }
             }
         }
