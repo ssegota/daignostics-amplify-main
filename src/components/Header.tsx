@@ -170,17 +170,23 @@ const Header: React.FC = () => {
                         </a>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                             <span style={{ color: 'var(--dark-gray)' }}>
-                                Welcome, <span
-                                    onClick={handleEditClick}
-                                    style={{
-                                        textDecoration: 'underline',
-                                        cursor: 'pointer',
-                                        fontWeight: 'bold',
-                                        color: 'var(--primary-color)'
-                                    }}
-                                >
-                                    {displayName}
-                                </span>
+                                Welcome, {currentUser?.role === 'patient' ? (
+                                    <span style={{ fontWeight: 'bold', color: 'var(--dark-gray)' }}>
+                                        {displayName}
+                                    </span>
+                                ) : (
+                                    <span
+                                        onClick={handleEditClick}
+                                        style={{
+                                            textDecoration: 'underline',
+                                            cursor: 'pointer',
+                                            fontWeight: 'bold',
+                                            color: 'var(--primary-color)'
+                                        }}
+                                    >
+                                        {displayName}
+                                    </span>
+                                )}
                             </span>
                             <button onClick={() => logout()} className="btn btn-secondary">
                                 Logout
