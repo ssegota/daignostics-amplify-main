@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { generateClient } from 'aws-amplify/data';
 import type { Schema } from '../../amplify/data/resource';
 import { useAuth } from '../AuthContext';
+import Header from './Header';
 
 const client = generateClient<Schema>();
 
@@ -30,7 +31,7 @@ interface MetricInfo {
 const ExperimentDetails: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const { currentDoctor, logout } = useAuth();
+    const { currentDoctor } = useAuth();
     const [experiment, setExperiment] = useState<Experiment | null>(null);
     const [patientName, setPatientName] = useState<string>('');
     const [loading, setLoading] = useState(true);
@@ -325,21 +326,7 @@ const ExperimentDetails: React.FC = () => {
     if (loading) {
         return (
             <>
-                <header className="header">
-                    <div className="container">
-                        <div className="header-content">
-                            <a href="/" className="logo">dAIgnostics</a>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                                <span style={{ color: 'var(--dark-gray)' }}>
-                                    Welcome, Dr. {currentDoctor?.username}
-                                </span>
-                                <button onClick={logout} className="btn btn-secondary">
-                                    Logout
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </header>
+                <Header />
                 <div className="loading-container">
                     <span className="spinner" style={{ width: '40px', height: '40px' }}></span>
                 </div>
@@ -350,13 +337,7 @@ const ExperimentDetails: React.FC = () => {
     if (error || !experiment) {
         return (
             <>
-                <header className="header">
-                    <div className="container">
-                        <div className="header-content">
-                            <a href="/" className="logo">dAIgnostics</a>
-                        </div>
-                    </div>
-                </header>
+                <Header />
                 <div className="empty-state">
                     <div className="empty-state-icon">⚠️</div>
                     <p>{error || 'Experiment not found'}</p>
@@ -370,21 +351,7 @@ const ExperimentDetails: React.FC = () => {
 
     return (
         <>
-            <header className="header">
-                <div className="container">
-                    <div className="header-content">
-                        <a href="/" className="logo">dAIgnostics</a>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                            <span style={{ color: 'var(--dark-gray)' }}>
-                                Welcome, Dr. {currentDoctor?.username}
-                            </span>
-                            <button onClick={logout} className="btn btn-secondary">
-                                Logout
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </header>
+            <Header />
 
             <div className="patient-list-container">
                 <div className="container">

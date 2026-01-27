@@ -6,6 +6,7 @@ import type { Schema } from '../../amplify/data/resource';
 const client = generateClient<Schema>();
 
 interface Doctor {
+    id?: string;
     username: string;
     email: string;
     firstName?: string;
@@ -22,6 +23,7 @@ const Header: React.FC = () => {
     const [showEditModal, setShowEditModal] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [form, setForm] = useState<Doctor>({
+        id: '',
         username: '',
         email: '',
         firstName: '',
@@ -41,29 +43,70 @@ const Header: React.FC = () => {
     const fetchDoctorDetails = async () => {
         if (!currentDoctor) return;
         try {
-            const { data } = await client.models.Doctor.get({ username: currentDoctor.username } as any);
-            if (data) {
-                setDoctorDetails(data as any);
-                setForm(data as any);
+            console.log('Fetching doctor details for:', currentDoctor.username);
+            // Use list with filter since username is not the primary key (id is auto-generated)
+            const { data } = await client.models.Doctor.list({
+                filter: { username: { eq: currentDoctor.username } }
+            });
+            console.log('Doctor data received:', data);
+            if (data && data.length > 0) {
+                setDoctorDetails(data[0] as any);
+                setForm(data[0] as any);
+            } else {
+                console.warn('No doctor data found, using currentDoctor as fallback');
+                // Use currentDoctor as fallback
+                setDoctorDetails({
+                    username: currentDoctor.username,
+                    email: currentDoctor.email || '',
+                } as Doctor);
+                setForm({
+                    username: currentDoctor.username,
+                    email: currentDoctor.email || '',
+                    firstName: '',
+                    lastName: '',
+                    primaryInstitution: '',
+                    primaryInstitutionAddress: '',
+                    secondaryInstitution: '',
+                    secondaryInstitutionAddress: ''
+                });
             }
         } catch (err) {
             console.error('Error fetching doctor details:', err);
+            // Still set basic info from currentDoctor
+            setDoctorDetails({
+                username: currentDoctor.username,
+                email: currentDoctor.email || '',
+            } as Doctor);
         }
     };
 
     const handleEditClick = () => {
+        // Always allow opening the modal - use whatever data we have
         if (doctorDetails) {
             setForm(doctorDetails);
-            setShowEditModal(true);
+        } else if (currentDoctor) {
+            // Fallback to basic info
+            setForm({
+                username: currentDoctor.username,
+                email: currentDoctor.email || '',
+                firstName: '',
+                lastName: '',
+                primaryInstitution: '',
+                primaryInstitutionAddress: '',
+                secondaryInstitution: '',
+                secondaryInstitutionAddress: ''
+            });
         }
+        setShowEditModal(true);
     };
 
     const handleUpdateDoctor = async (e: React.FormEvent) => {
         e.preventDefault();
         setSubmitting(true);
         try {
-            const { data } = await client.models.Doctor.update({
-                username: form.username,
+            console.log('Attempting to update doctor with:', form);
+            const { data, errors } = await client.models.Doctor.update({
+                id: form.id!,  // Use id for the primary key
                 firstName: form.firstName,
                 lastName: form.lastName,
                 email: form.email,
@@ -71,12 +114,24 @@ const Header: React.FC = () => {
                 primaryInstitutionAddress: form.primaryInstitutionAddress,
                 secondaryInstitution: form.secondaryInstitution,
                 secondaryInstitutionAddress: form.secondaryInstitutionAddress,
-            } as any);
-            setDoctorDetails(data as Doctor);
+            });
+
+            if (errors && errors.length > 0) {
+                console.error('Update errors:', errors);
+                alert('Failed to update profile: ' + errors.map(e => e.message).join(', '));
+                return;
+            }
+
+            console.log('Update successful, received:', data);
+            if (data) {
+                setDoctorDetails(data as Doctor);
+                // Re-fetch to ensure we have latest data
+                await fetchDoctorDetails();
+            }
             setShowEditModal(false);
         } catch (err) {
             console.error('Error updating doctor:', err);
-            alert('Failed to update profile');
+            alert('Failed to update profile: ' + (err instanceof Error ? err.message : 'Unknown error'));
         } finally {
             setSubmitting(false);
         }
