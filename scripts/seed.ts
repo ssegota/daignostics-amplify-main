@@ -91,7 +91,49 @@ function generateExperiment(patientId: string) {
     };
 }
 
+async function deleteAllData() {
+    console.log('🗑️  Deleting existing data...\n');
+
+    // Delete all experiments
+    try {
+        const experiments = await client.models.Experiment.list({ limit: 1000 });
+        for (const exp of experiments.data || []) {
+            await client.models.Experiment.delete({ id: exp.id });
+        }
+        console.log(`✅ Deleted ${experiments.data?.length || 0} experiments`);
+    } catch (error) {
+        console.error('❌ Error deleting experiments:', error);
+    }
+
+    // Delete all patients
+    try {
+        const patients = await client.models.Patient.list({ limit: 1000 });
+        for (const patient of patients.data || []) {
+            await client.models.Patient.delete({ id: patient.id });
+        }
+        console.log(`✅ Deleted ${patients.data?.length || 0} patients`);
+    } catch (error) {
+        console.error('❌ Error deleting patients:', error);
+    }
+
+    // Delete all doctors
+    try {
+        const doctors = await client.models.Doctor.list({ limit: 1000 });
+        for (const doctor of doctors.data || []) {
+            await client.models.Doctor.delete({ username: doctor.username } as any);
+        }
+        console.log(`✅ Deleted ${doctors.data?.length || 0} doctors`);
+    } catch (error) {
+        console.error('❌ Error deleting doctors:', error);
+    }
+
+    console.log('');
+}
+
 async function seedDatabase() {
+    // Delete existing data first
+    await deleteAllData();
+
     console.log('🌱 Starting database seeding...\n');
 
     // Create doctors
