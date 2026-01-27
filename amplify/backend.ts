@@ -36,11 +36,6 @@ lambdaFunction.addToRolePolicy(
 lambdaFunction.addEnvironment('USER_POOL_ID', userPoolId);
 
 // Grant authenticated users permission to invoke the Lambda function
+// Using grantInvoke for more reliable permissions
 const authenticatedRole = backend.auth.resources.authenticatedUserIamRole;
-authenticatedRole.addToPrincipalPolicy(
-  new PolicyStatement({
-    effect: Effect.ALLOW,
-    actions: ['lambda:InvokeFunction'],
-    resources: [lambdaFunction.functionArn],
-  })
-);
+lambdaFunction.grantInvoke(authenticatedRole);
