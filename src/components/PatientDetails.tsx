@@ -26,6 +26,15 @@ interface Patient {
     firstName: string;
     lastName: string;
     doctor: string;
+    dateOfBirth?: string;
+    insuranceNumber?: string;
+    height?: number;
+    weight?: number;
+}
+
+interface Doctor {
+    username: string;
+    email: string;
 }
 
 const PatientDetails: React.FC = () => {
@@ -36,6 +45,19 @@ const PatientDetails: React.FC = () => {
     const [experiments, setExperiments] = useState<Experiment[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [showTransferModal, setShowTransferModal] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+    const [doctors, setDoctors] = useState<Doctor[]>([]);
+    const [transferDoctorId, setTransferDoctorId] = useState('');
+    const [editForm, setEditForm] = useState({
+        firstName: '',
+        lastName: '',
+        dateOfBirth: '',
+        insuranceNumber: '',
+        height: '',
+        weight: '',
+    });
 
     useEffect(() => {
         if (!id) return;
@@ -68,6 +90,86 @@ const PatientDetails: React.FC = () => {
             setError('Failed to load patient data');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleEditClick = () => {
+        if (!patient) return;
+        setEditForm({
+            firstName: patient.firstName,
+            lastName: patient.lastName,
+            dateOfBirth: patient.dateOfBirth || '',
+            insuranceNumber: patient.insuranceNumber || '',
+            height: patient.height?.toString() || '',
+            weight: patient.weight?.toString() || '',
+        });
+        setShowEditModal(true);
+    };
+
+    const handleEditPatient = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!patient) return;
+
+        setSubmitting(true);
+        try {
+            const { data } = await client.models.Patient.update({
+                id: patient.id,
+                firstName: editForm.firstName,
+                lastName: editForm.lastName,
+                dateOfBirth: editForm.dateOfBirth,
+                insuranceNumber: editForm.insuranceNumber,
+                height: parseFloat(editForm.height),
+                weight: parseFloat(editForm.weight),
+            });
+
+            if (data) {
+                setPatient(data as Patient);
+                setShowEditModal(false);
+            }
+        } catch (err) {
+            console.error('Error updating patient:', err);
+            alert('Failed to update patient');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleTransferClick = async () => {
+        if (doctors.length === 0) {
+            try {
+                const { data } = await client.models.Doctor.list();
+                setDoctors(data as Doctor[]);
+            } catch (err) {
+                console.error('Error fetching doctors:', err);
+                alert('Failed to load doctors list');
+                return;
+            }
+        }
+        setShowTransferModal(true);
+    };
+
+    const handleTransferPatient = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!patient || !transferDoctorId) return;
+
+        if (!window.confirm('Are you sure you want to transfer this patient? You will lose access to this patient record.')) {
+            return;
+        }
+
+        setSubmitting(true);
+        try {
+            await client.models.Patient.update({
+                id: patient.id,
+                doctor: transferDoctorId,
+            });
+
+            alert('Patient transferred successfully');
+            navigate('/');
+        } catch (err) {
+            console.error('Error transferring patient:', err);
+            alert('Failed to transfer patient');
+        } finally {
+            setSubmitting(false);
         }
     };
 
@@ -142,10 +244,30 @@ const PatientDetails: React.FC = () => {
                     </button>
 
                     <div className="patient-details-header">
-                        <h1>{patient.firstName} {patient.lastName}</h1>
-                        <p style={{ color: 'var(--dark-gray)', marginTop: 'var(--spacing-xs)' }}>
-                            Patient ID: {patient.id.slice(0, 8)}
-                        </p>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <div>
+                                <h1>{patient.firstName} {patient.lastName}</h1>
+                                <p style={{ color: 'var(--dark-gray)', marginTop: 'var(--spacing-xs)' }}>
+                                    Patient ID: {patient.id.slice(0, 8)}
+                                </p>
+                                {patient.dateOfBirth && (
+                                    <p style={{ color: 'var(--dark-gray)', marginTop: 'var(--spacing-xs)' }}>
+                                        DOB: {new Date(patient.dateOfBirth).toLocaleDateString()} |
+                                        Insurance: {patient.insuranceNumber || 'N/A'} |
+                                        Height: {patient.height || '-'} cm |
+                                        Weight: {patient.weight || '-'} kg
+                                    </p>
+                                )}
+                            </div>
+                            <div style={{ display: 'flex', gap: '1rem' }}>
+                                <button onClick={handleEditClick} className="btn btn-secondary">
+                                    Edit Patient
+                                </button>
+                                <button onClick={handleTransferClick} className="btn btn-secondary" style={{ borderColor: 'var(--charcoal)', color: 'var(--charcoal)' }}>
+                                    Transfer
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
                     <h2 className="mt-lg mb-md">Experiments</h2>
@@ -186,6 +308,130 @@ const PatientDetails: React.FC = () => {
                     )}
                 </div>
             </div>
+
+            {showEditModal && (
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <div className="modal-header">
+                            <h2>Edit Patient</h2>
+                            <button onClick={() => setShowEditModal(false)} className="modal-close">×</button>
+                        </div>
+                        <form onSubmit={handleEditPatient}>
+                            <div className="modal-body">
+                                <div className="form-group">
+                                    <label>First Name</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={editForm.firstName}
+                                        onChange={(e) => setEditForm({ ...editForm, firstName: e.target.value })}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>Last Name</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={editForm.lastName}
+                                        onChange={(e) => setEditForm({ ...editForm, lastName: e.target.value })}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>Date of Birth</label>
+                                    <input
+                                        type="date"
+                                        value={editForm.dateOfBirth}
+                                        onChange={(e) => setEditForm({ ...editForm, dateOfBirth: e.target.value })}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>Insurance Number</label>
+                                    <input
+                                        type="text"
+                                        value={editForm.insuranceNumber}
+                                        onChange={(e) => setEditForm({ ...editForm, insuranceNumber: e.target.value })}
+                                    />
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                    <div className="form-group">
+                                        <label>Height (cm)</label>
+                                        <input
+                                            type="number"
+                                            step="0.1"
+                                            value={editForm.height}
+                                            onChange={(e) => setEditForm({ ...editForm, height: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Weight (kg)</label>
+                                        <input
+                                            type="number"
+                                            step="0.1"
+                                            value={editForm.weight}
+                                            onChange={(e) => setEditForm({ ...editForm, weight: e.target.value })}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="modal-footer">
+                                <button type="button" onClick={() => setShowEditModal(false)} className="btn btn-secondary">
+                                    Cancel
+                                </button>
+                                <button type="submit" className="btn btn-primary" disabled={submitting}>
+                                    {submitting ? 'Saving...' : 'Save Changes'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {showTransferModal && (
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <div className="modal-header">
+                            <h2>Transfer Patient</h2>
+                            <button onClick={() => setShowTransferModal(false)} className="modal-close">×</button>
+                        </div>
+                        <form onSubmit={handleTransferPatient}>
+                            <div className="modal-body">
+                                <p className="mb-md">
+                                    Select a doctor to transfer <strong>{patient?.firstName} {patient?.lastName}</strong> to.
+                                    <br />
+                                    <span style={{ color: 'var(--primary-red)', fontSize: '0.9em' }}>
+                                        Warning: You will lose access to this patient after transfer.
+                                    </span>
+                                </p>
+                                <div className="form-group">
+                                    <label>Select Doctor</label>
+                                    <select
+                                        required
+                                        value={transferDoctorId}
+                                        onChange={(e) => setTransferDoctorId(e.target.value)}
+                                    >
+                                        <option value="">-- Select Doctor --</option>
+                                        {doctors
+                                            .filter(d => d.username !== currentDoctor?.username)
+                                            .map(doctor => (
+                                                <option key={doctor.username} value={doctor.username}>
+                                                    Dr. {doctor.username} ({doctor.email})
+                                                </option>
+                                            ))}
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="modal-footer">
+                                <button type="button" onClick={() => setShowTransferModal(false)} className="btn btn-secondary">
+                                    Cancel
+                                </button>
+                                <button type="submit" className="btn btn-primary" disabled={submitting || !transferDoctorId}>
+                                    {submitting ? 'Transferring...' : 'Transfer Patient'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </>
     );
 };

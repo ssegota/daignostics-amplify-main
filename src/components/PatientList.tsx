@@ -11,6 +11,10 @@ interface Patient {
     firstName: string;
     lastName: string;
     doctor: string;
+    dateOfBirth?: string;
+    insuranceNumber?: string;
+    height?: number;
+    weight?: number;
 }
 
 const PatientList: React.FC = () => {
@@ -19,6 +23,16 @@ const PatientList: React.FC = () => {
     const [patients, setPatients] = useState<Patient[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+    const [newPatient, setNewPatient] = useState({
+        firstName: '',
+        lastName: '',
+        dateOfBirth: '',
+        insuranceNumber: '',
+        height: '',
+        weight: '',
+    });
 
     useEffect(() => {
         fetchPatients();
@@ -44,6 +58,42 @@ const PatientList: React.FC = () => {
         }
     };
 
+    const handleAddPatient = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!currentDoctor) return;
+
+        setSubmitting(true);
+        try {
+            const { data } = await client.models.Patient.create({
+                firstName: newPatient.firstName,
+                lastName: newPatient.lastName,
+                doctor: currentDoctor.username,
+                dateOfBirth: newPatient.dateOfBirth,
+                insuranceNumber: newPatient.insuranceNumber,
+                height: parseFloat(newPatient.height),
+                weight: parseFloat(newPatient.weight),
+            });
+
+            if (data) {
+                setPatients([...patients, data as Patient]);
+                setShowAddModal(false);
+                setNewPatient({
+                    firstName: '',
+                    lastName: '',
+                    dateOfBirth: '',
+                    insuranceNumber: '',
+                    height: '',
+                    weight: '',
+                });
+            }
+        } catch (err) {
+            console.error('Error creating patient:', err);
+            alert('Failed to create patient');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
     return (
         <>
             <header className="header">
@@ -66,6 +116,9 @@ const PatientList: React.FC = () => {
                 <div className="container">
                     <div className="patient-list-header">
                         <h1>My Patients</h1>
+                        <button onClick={() => setShowAddModal(true)} className="btn btn-primary">
+                            + Add Patient
+                        </button>
                     </div>
 
                     {loading ? (
@@ -105,6 +158,86 @@ const PatientList: React.FC = () => {
                     )}
                 </div>
             </div>
+            {showAddModal && (
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <div className="modal-header">
+                            <h2>Add New Patient</h2>
+                            <button onClick={() => setShowAddModal(false)} className="modal-close">×</button>
+                        </div>
+                        <form onSubmit={handleAddPatient}>
+                            <div className="modal-body">
+                                <div className="form-group">
+                                    <label>First Name</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={newPatient.firstName}
+                                        onChange={(e) => setNewPatient({ ...newPatient, firstName: e.target.value })}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>Last Name</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={newPatient.lastName}
+                                        onChange={(e) => setNewPatient({ ...newPatient, lastName: e.target.value })}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>Date of Birth</label>
+                                    <input
+                                        type="date"
+                                        required
+                                        value={newPatient.dateOfBirth}
+                                        onChange={(e) => setNewPatient({ ...newPatient, dateOfBirth: e.target.value })}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>Insurance Number</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={newPatient.insuranceNumber}
+                                        onChange={(e) => setNewPatient({ ...newPatient, insuranceNumber: e.target.value })}
+                                    />
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                    <div className="form-group">
+                                        <label>Height (cm)</label>
+                                        <input
+                                            type="number"
+                                            step="0.1"
+                                            required
+                                            value={newPatient.height}
+                                            onChange={(e) => setNewPatient({ ...newPatient, height: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Weight (kg)</label>
+                                        <input
+                                            type="number"
+                                            step="0.1"
+                                            required
+                                            value={newPatient.weight}
+                                            onChange={(e) => setNewPatient({ ...newPatient, weight: e.target.value })}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="modal-footer">
+                                <button type="button" onClick={() => setShowAddModal(false)} className="btn btn-secondary">
+                                    Cancel
+                                </button>
+                                <button type="submit" className="btn btn-primary" disabled={submitting}>
+                                    {submitting ? 'Adding...' : 'Add Patient'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </>
     );
 };

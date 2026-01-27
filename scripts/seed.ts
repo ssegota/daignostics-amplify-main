@@ -33,6 +33,19 @@ function randomFloat(min: number, max: number): number {
     return Math.random() * (max - min) + min;
 }
 
+function randomDate(start: Date, end: Date): string {
+    return new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime())).toISOString().split('T')[0];
+}
+
+function randomString(length: number): string {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+}
+
 function generateExperiment(patientId: string) {
     const now = new Date();
     const daysAgo = Math.floor(Math.random() * 180); // Random date within last 6 months
@@ -79,6 +92,10 @@ async function seedDatabase() {
                 firstName: getRandomElement(firstNames),
                 lastName: getRandomElement(lastNames),
                 doctor: doctor.username,
+                dateOfBirth: randomDate(new Date(1950, 0, 1), new Date(2005, 0, 1)),
+                insuranceNumber: randomString(10),
+                height: parseFloat(randomFloat(150, 200).toFixed(1)),
+                weight: parseFloat(randomFloat(50, 120).toFixed(1)),
             };
 
             try {

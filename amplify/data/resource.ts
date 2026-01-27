@@ -14,6 +14,10 @@ const schema = a.schema({
             firstName: a.string().required(),
             lastName: a.string().required(),
             doctor: a.string().required(),
+            dateOfBirth: a.string(),
+            insuranceNumber: a.string(),
+            height: a.float(),
+            weight: a.float(),
         })
         .authorization((allow) => [allow.publicApiKey()]),
 
