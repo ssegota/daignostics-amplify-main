@@ -31,6 +31,7 @@ interface Patient {
     insuranceNumber?: string;
     height?: number;
     weight?: number;
+    cognitoId?: string;
 }
 
 interface Doctor {
@@ -240,7 +241,7 @@ const PatientDetails: React.FC = () => {
                     <h2 className="mt-lg mb-md">Experiments</h2>
 
                     <div className="mb-lg">
-                        <CSVUpload patientId={id!} onUploadComplete={fetchPatientAndExperiments} />
+                        <CSVUpload patientId={id!} patientCognitoId={patient?.cognitoId} onUploadComplete={fetchPatientAndExperiments} />
                     </div>
 
                     {experiments.length === 0 ? (

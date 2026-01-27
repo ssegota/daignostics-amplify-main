@@ -6,10 +6,11 @@ const client = generateClient<Schema>();
 
 interface CSVUploadProps {
     patientId: string;
+    patientCognitoId?: string;
     onUploadComplete: () => void;
 }
 
-const CSVUpload: React.FC<CSVUploadProps> = ({ patientId, onUploadComplete }) => {
+const CSVUpload: React.FC<CSVUploadProps> = ({ patientId, patientCognitoId, onUploadComplete }) => {
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState('');
     const [dragActive, setDragActive] = useState(false);
@@ -43,7 +44,7 @@ const CSVUpload: React.FC<CSVUploadProps> = ({ patientId, onUploadComplete }) =>
             // Only fail if we have fewer values than required key fields (unlikely to work)
         }
 
-        const data: any = { patientId };
+        const data: any = { patientId, patientCognitoId };
         let hasValidField = false;
 
         for (let i = 0; i < Math.min(headers.length, values.length); i++) {
