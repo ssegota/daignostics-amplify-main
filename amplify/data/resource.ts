@@ -21,6 +21,7 @@ const schema = a.schema({
             lastName: a.string().required(),
             doctor: a.string().required(),
             dateOfBirth: a.string(),
+            gender: a.string(),
             insuranceNumber: a.string(),
             height: a.float(),
             weight: a.float(),

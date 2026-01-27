@@ -161,6 +161,7 @@ async function seedDatabase() {
                 lastName: getRandomElement(lastNames),
                 doctor: doctor.username,
                 dateOfBirth: randomDate(new Date(1950, 0, 1), new Date(2005, 0, 1)),
+                gender: getRandomElement(['Male', 'Female']),
                 insuranceNumber: randomString(10),
                 height: parseFloat(randomFloat(150, 200).toFixed(1)),
                 weight: parseFloat(randomFloat(50, 120).toFixed(1)),
