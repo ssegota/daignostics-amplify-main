@@ -12,22 +12,31 @@ const backend = defineBackend({
   data,
 });
 
+// Get auth resources
+const userPoolArn = backend.auth.resources.userPool.userPoolArn;
+const userPoolId = backend.auth.resources.userPool.userPoolId;
+
 // Grant the Lambda function (defined as data handler) permission to manage Cognito users
-const createPatientLambda = backend.data.resources.functions['createPatientCognitoUser'] as Function | undefined;
-if (createPatientLambda) {
-  const userPoolArn = backend.auth.resources.userPool.userPoolArn;
-  const userPoolId = backend.auth.resources.userPool.userPoolId;
+// Iterate over all functions to find the create-patient-cognito Lambda
+const functions = backend.data.resources.functions;
+for (const [name, fn] of Object.entries(functions)) {
+  console.log('Found function:', name);
+  if (name.includes('createPatientCognito') || name.includes('create-patient-cognito')) {
+    const lambdaFn = fn as Function;
 
-  createPatientLambda.addToRolePolicy(
-    new PolicyStatement({
-      effect: Effect.ALLOW,
-      actions: [
-        'cognito-idp:AdminCreateUser',
-        'cognito-idp:AdminSetUserPassword',
-      ],
-      resources: [userPoolArn],
-    })
-  );
+    lambdaFn.addToRolePolicy(
+      new PolicyStatement({
+        effect: Effect.ALLOW,
+        actions: [
+          'cognito-idp:AdminCreateUser',
+          'cognito-idp:AdminSetUserPassword',
+        ],
+        resources: [userPoolArn],
+      })
+    );
 
-  createPatientLambda.addEnvironment('USER_POOL_ID', userPoolId);
+    lambdaFn.addEnvironment('USER_POOL_ID', userPoolId);
+    console.log('Configured Lambda:', name);
+  }
 }
+
