@@ -40,16 +40,16 @@ const PatientDashboard: React.FC = () => {
 
                 {/* Dashboard Stats */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem', marginBottom: '2.5rem' }}>
-                    <div className="card" style={{ padding: '1.5rem', borderRadius: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', backgroundColor: 'white' }}>
-                        <h3 style={{ color: 'var(--dark-gray)', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Tests</h3>
-                        <p style={{ fontSize: '2.5rem', fontWeight: 'bold', color: 'var(--primary-color)', margin: '0.5rem 0' }}>{experiments.length}</p>
+                    <div className="card" style={{ padding: '1.5rem', borderRadius: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', backgroundColor: 'white', display: 'flex', flexDirection: 'column', height: '100%' }}>
+                        <h3 style={{ color: 'var(--dark-gray)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.5rem' }}>Total Tests</h3>
+                        <p style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--primary-color)', margin: 'auto 0' }}>{experiments.length}</p>
                     </div>
-                    <div className="card" style={{ padding: '1.5rem', borderRadius: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', backgroundColor: 'white' }}>
-                        <h3 style={{ color: 'var(--dark-gray)', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Latest Result</h3>
-                        <p style={{ fontSize: '1.2rem', fontWeight: '600', color: 'var(--charcoal)', margin: '0.5rem 0' }}>
+                    <div className="card" style={{ padding: '1.5rem', borderRadius: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', backgroundColor: 'white', display: 'flex', flexDirection: 'column', height: '100%' }}>
+                        <h3 style={{ color: 'var(--dark-gray)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.5rem' }}>Latest Result</h3>
+                        <p style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--charcoal)', margin: 'auto 0' }}>
                             {experiments.length > 0
                                 ? new Date(Math.max(...experiments.map(e => new Date(e.generationDate).getTime()))).toLocaleDateString()
-                                : 'N/A'}
+                                : '-'}
                         </p>
                     </div>
                 </div>
@@ -60,7 +60,7 @@ const PatientDashboard: React.FC = () => {
                     </div>
 
                     <div className="table-container">
-                        <table className="data-table">
+                        <table className="data-table" style={{ width: '100%' }}>
                             <thead>
                                 <tr>
                                     <th>Date</th>
