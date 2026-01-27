@@ -11,7 +11,15 @@ import './index.css';
 Amplify.configure(outputs);
 
 function AppContent() {
-  const { currentDoctor } = useAuth();
+  const { currentDoctor, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <span className="spinner" style={{ width: '50px', height: '50px' }}></span>
+      </div>
+    );
+  }
 
   if (!currentDoctor) {
     return <Login />;

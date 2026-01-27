@@ -4,7 +4,6 @@ const schema = a.schema({
     Doctor: a
         .model({
             username: a.id().required(),
-            password: a.string().required(),
             email: a.string().required(),
             firstName: a.string(),
             lastName: a.string(),
@@ -13,7 +12,7 @@ const schema = a.schema({
             secondaryInstitution: a.string(),
             secondaryInstitutionAddress: a.string(),
         })
-        .authorization((allow) => [allow.publicApiKey()]),
+        .authorization((allow) => [allow.owner()]),
 
     Patient: a
         .model({
@@ -26,7 +25,7 @@ const schema = a.schema({
             height: a.float(),
             weight: a.float(),
         })
-        .authorization((allow) => [allow.publicApiKey()]),
+        .authorization((allow) => [allow.owner()]),
 
     Experiment: a
         .model({
@@ -41,7 +40,7 @@ const schema = a.schema({
             kurtosis: a.float().required(),
             generationDate: a.datetime().required(),
         })
-        .authorization((allow) => [allow.publicApiKey()]),
+        .authorization((allow) => [allow.owner()]),
 });
 
 export type Schema = ClientSchema<typeof schema>;
@@ -49,9 +48,6 @@ export type Schema = ClientSchema<typeof schema>;
 export const data = defineData({
     schema,
     authorizationModes: {
-        defaultAuthorizationMode: 'apiKey',
-        apiKeyAuthorizationMode: {
-            expiresInDays: 30,
-        },
+        defaultAuthorizationMode: 'userPool',
     },
 });

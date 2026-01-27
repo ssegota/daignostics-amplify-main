@@ -1,11 +1,23 @@
 import { Amplify } from 'aws-amplify';
 import { generateClient } from 'aws-amplify/data';
+import { signIn, signOut, getCurrentUser } from 'aws-amplify/auth';
+import {
+    CognitoIdentityProviderClient,
+    AdminCreateUserCommand,
+    AdminSetUserPasswordCommand,
+    AdminDeleteUserCommand
+} from '@aws-sdk/client-cognito-identity-provider';
 import type { Schema } from '../amplify/data/resource';
 import outputs from '../amplify_outputs.json';
 
 Amplify.configure(outputs);
 
 const client = generateClient<Schema>();
+
+// Use 'any' to bypass strict type checking on the outputs structure if needed, 
+// though verify your amplify_outputs.json structure usually matches this.
+const authConfig = (outputs as any).auth;
+const cognitoClient = new CognitoIdentityProviderClient({ region: authConfig.aws_region });
 
 const firstNames = [
     'James', 'Mary', 'John', 'Patricia', 'Robert', 'Jennifer', 'Michael', 'Linda',
@@ -22,7 +34,7 @@ const lastNames = [
 const doctors = [
     {
         username: 'drjones',
-        password: 'password123',
+        password: 'Password123!', // Stronger password for Cognito policies
         email: 'drjones@daignostics.info',
         firstName: 'Indiana',
         lastName: 'Jones',
@@ -31,7 +43,7 @@ const doctors = [
     },
     {
         username: 'drsmith',
-        password: 'password123',
+        password: 'Password123!',
         email: 'drsmith@daignostics.info',
         firstName: 'John',
         lastName: 'Smith',
@@ -42,7 +54,7 @@ const doctors = [
     },
     {
         username: 'drbrown',
-        password: 'password123',
+        password: 'Password123!',
         email: 'drbrown@daignostics.info',
         firstName: 'Emmett',
         lastName: 'Brown',
@@ -91,75 +103,144 @@ function generateExperiment(patientId: string) {
     };
 }
 
-async function deleteAllData() {
-    console.log('🗑️  Deleting existing data...\n');
+async function cleanUpDoctorData(doctorUsername: string) {
+    // Assuming we are signed in as the doctor
+    console.log(`🧹 Cleaning up data for ${doctorUsername}...`);
 
-    // Delete all experiments
+    // Delete experiments
     try {
         const experiments = await client.models.Experiment.list({ limit: 1000 });
         for (const exp of experiments.data || []) {
             await client.models.Experiment.delete({ id: exp.id });
         }
-        console.log(`✅ Deleted ${experiments.data?.length || 0} experiments`);
-    } catch (error) {
-        console.error('❌ Error deleting experiments:', error);
+        console.log(`   - Deleted ${experiments.data.length} experiments`);
+    } catch (e) {
+        console.log(`   - Error deleting experiments (might be empty or permission issue): ${e}`);
     }
 
-    // Delete all patients
+    // Delete patients
     try {
         const patients = await client.models.Patient.list({ limit: 1000 });
-        for (const patient of patients.data || []) {
-            await client.models.Patient.delete({ id: patient.id });
+        for (const p of patients.data || []) {
+            await client.models.Patient.delete({ id: p.id });
         }
-        console.log(`✅ Deleted ${patients.data?.length || 0} patients`);
-    } catch (error) {
-        console.error('❌ Error deleting patients:', error);
+        console.log(`   - Deleted ${patients.data.length} patients`);
+    } catch (e) {
+        console.log(`   - Error deleting patients: ${e}`);
     }
 
-    // Delete all doctors
+    // Delete doctor profile
+    // Note: We need to find the profile first, as primary key is 'username' (which is the string ID we set)
+    // Wait, the schema uses 'username' as the primary key? No, 'username' is a field. 
+    // Wait, let's check schema: Doctor: model({ username: a.id().required(), ... })
+    // So 'username' IS the primary key.
     try {
-        const doctors = await client.models.Doctor.list({ limit: 1000 });
-        for (const doctor of doctors.data || []) {
-            await client.models.Doctor.delete({ username: doctor.username } as any);
-        }
-        console.log(`✅ Deleted ${doctors.data?.length || 0} doctors`);
-    } catch (error) {
-        console.error('❌ Error deleting doctors:', error);
+        await client.models.Doctor.delete({ username: doctorUsername } as any);
+        console.log(`   - Deleted doctor profile`);
+    } catch (e) {
+        console.log(`   - Msg: Could not delete profile (may not exist)`);
     }
-
-    console.log('');
 }
 
 async function seedDatabase() {
-    // Delete existing data first
-    await deleteAllData();
+    console.log('🌱 Starting database seeding with Cognito integration...\n');
 
-    console.log('🌱 Starting database seeding...\n');
-
-    // Create doctors
-    console.log('Creating doctors...');
     for (const doctor of doctors) {
+        console.log(`\nProcessing Dr. ${doctor.lastName} (${doctor.username})...`);
+
+        // 1. Try to Authenticate to clean up OLD data if user exists
+        let isAuthenticated = false;
         try {
-            await client.models.Doctor.create(doctor);
-            console.log(`✅ Created doctor: ${doctor.username}`);
-        } catch (error) {
-            console.error(`❌ Error creating doctor ${doctor.username}:`, error);
+            await signIn({ username: doctor.email, password: doctor.password });
+            const user = await getCurrentUser();
+            console.log(`✅ Authentication successful. User ID: ${user.username}`);
+            isAuthenticated = true;
+            // Clean up using the ACTUAL username (sub) if possible, or try to clean up by email if we stored it that way before
+            // But realistically, we just want to suppress errors if it fails
+            await cleanUpDoctorData(user.username);
+            await signOut();
+        } catch (error: any) {
+            console.log(`ℹ️ Could not sign in (User might not exist yet): ${error.message}`);
         }
-    }
 
-    console.log('\nCreating patients and experiments...');
+        // 2. Reset (Delete & Recreate) Cognito User
+        console.log(`🔄 Resetting Cognito User...`);
+        try {
+            // Try delete first
+            await cognitoClient.send(new AdminDeleteUserCommand({
+                UserPoolId: authConfig.user_pool_id,
+                Username: doctor.email
+            }));
+            console.log(`   - Deleted existing user.`);
+        } catch (e) {
+            // Ignore if user doesn't exist
+        }
 
-    const allPatientIds: string[] = [];
+        try {
+            await cognitoClient.send(new AdminCreateUserCommand({
+                UserPoolId: authConfig.user_pool_id,
+                Username: doctor.email,
+                UserAttributes: [
+                    { Name: 'email', Value: doctor.email },
+                    { Name: 'email_verified', Value: 'true' },
+                    { Name: 'given_name', Value: doctor.firstName },
+                    { Name: 'family_name', Value: doctor.lastName }
+                ],
+                MessageAction: 'SUPPRESS'
+            }));
 
-    // Create patients for each doctor
-    for (const doctor of doctors) {
-        const patientCount = Math.floor(Math.random() * 6) + 3; // 3-8 patients per doctor
+            await cognitoClient.send(new AdminSetUserPasswordCommand({
+                UserPoolId: authConfig.user_pool_id,
+                Username: doctor.email,
+                Password: doctor.password,
+                Permanent: true
+            }));
+            console.log(`   - Created new user and set password.`);
+        } catch (error) {
+            console.error(`❌ Error creating Cognito user:`, error);
+            continue; // Skip to next doctor
+        }
+
+        // 3. Sign In with new user to generate data
+        console.log(`🔐 Signing in to seed data...`);
+        let userId = '';
+        try {
+            await signIn({ username: doctor.email, password: doctor.password });
+            const user = await getCurrentUser();
+            userId = user.username;
+            console.log(`   - Signed in as ${userId}`);
+        } catch (error) {
+            console.error(`❌ Failed to sign in after creation:`, error);
+            continue;
+        }
+
+        // 4. Create Doctor Profile
+        console.log(`📝 Creating Doctor Profile...`);
+        try {
+            await client.models.Doctor.create({
+                username: userId, // Use the ACTUAL Cognito User Sub
+                email: doctor.email,
+                firstName: doctor.firstName,
+                lastName: doctor.lastName,
+                primaryInstitution: doctor.primaryInstitution,
+                primaryInstitutionAddress: doctor.primaryInstitutionAddress,
+                secondaryInstitution: doctor.secondaryInstitution,
+                secondaryInstitutionAddress: doctor.secondaryInstitutionAddress
+            });
+            console.log(`   - Profile created.`);
+        } catch (error) {
+            console.error(`❌ Failed to create profile:`, error);
+        }
+
+        // 5. Create Patients & Experiments
+        console.log(`👥 Creating Patients & Experiments...`);
+        const patientCount = Math.floor(Math.random() * 6) + 3; // 3-8 patients
 
         for (let i = 0; i < patientCount; i++) {
-            const patient = {
+            const patientData = {
                 firstName: getRandomElement(firstNames),
                 lastName: getRandomElement(lastNames),
-                doctor: doctor.username,
+                doctor: userId, // Link to the ACTUAL Cognito User Sub
                 dateOfBirth: randomDate(new Date(1950, 0, 1), new Date(2005, 0, 1)),
                 gender: getRandomElement(['Male', 'Female']),
                 insuranceNumber: randomString(10),
@@ -167,74 +248,29 @@ async function seedDatabase() {
                 weight: parseFloat(randomFloat(50, 120).toFixed(1)),
             };
 
-            try {
-                const created = await client.models.Patient.create(patient);
-                console.log(`✅ Created patient: ${patient.firstName} ${patient.lastName} for ${doctor.username}`);
+            const newPatient = await client.models.Patient.create(patientData);
 
-                if (created.data?.id) {
-                    allPatientIds.push(created.data.id);
+            if (newPatient.data) {
+                // Create experiments for this patient (unless random skip)
+                if (Math.random() > 0.2) { // 80% chance of having experiments
+                    const experimentCount = Math.floor(Math.random() * 5) + 2;
+                    for (let j = 0; j < experimentCount; j++) {
+                        await client.models.Experiment.create(generateExperiment(newPatient.data.id));
+                    }
                 }
-            } catch (error) {
-                console.error(`❌ Error creating patient:`, error);
             }
         }
+        console.log(`   - Created ${patientCount} patients.`);
+
+        // 6. Sign Out
+        await signOut();
+        console.log(`👋 Done with ${doctor.username}.\n`);
     }
-
-    console.log('\nCreating experiments for patients...');
-
-    let totalExperiments = 0;
-
-    // Group patients by doctor to ensure 1-2 per doctor have no experiments
-    const patientsByDoctor: { [key: string]: string[] } = {};
-    const allPatients = await client.models.Patient.list();
-
-    allPatients.data?.forEach((patient) => {
-        if (patient.doctor && patient.id) {
-            if (!patientsByDoctor[patient.doctor]) {
-                patientsByDoctor[patient.doctor] = [];
-            }
-            patientsByDoctor[patient.doctor].push(patient.id);
-        }
-    });
-
-    // For each doctor, randomly select 1-2 patients to have NO experiments
-    const patientsWithoutExperiments = new Set<string>();
-    Object.values(patientsByDoctor).forEach((doctorPatients) => {
-        const countWithoutExperiments = Math.random() < 0.5 ? 1 : 2; // 1 or 2 patients
-        for (let i = 0; i < Math.min(countWithoutExperiments, doctorPatients.length); i++) {
-            const randomIndex = Math.floor(Math.random() * doctorPatients.length);
-            patientsWithoutExperiments.add(doctorPatients[randomIndex]);
-        }
-    });
-
-    for (const patientId of allPatientIds) {
-        // Skip if this patient should have no experiments
-        if (patientsWithoutExperiments.has(patientId)) {
-            console.log(`  Skipping patient ${patientId.slice(0, 8)} (no experiments)`);
-            continue;
-        }
-
-        const experimentCount = Math.floor(Math.random() * 5) + 2; // 2-6 experiments per patient
-
-        for (let i = 0; i < experimentCount; i++) {
-            const experiment = generateExperiment(patientId);
-
-            try {
-                await client.models.Experiment.create(experiment);
-                totalExperiments++;
-            } catch (error) {
-                console.error(`❌ Error creating experiment for patient ${patientId}:`, error);
-            }
-        }
-    }
-
-    console.log(`✅ Created ${totalExperiments} experiments`);
-    console.log(`📊 ${patientsWithoutExperiments.size} patients have no experiments\n`);
 
     console.log('\n✨ Database seeding complete!\n');
     console.log('Login credentials for doctors:');
     doctors.forEach(doctor => {
-        console.log(`  Username: ${doctor.username}, Password: ${doctor.password}`);
+        console.log(`  Username: ${doctor.email}, Password: ${doctor.password}`);
     });
 }
 

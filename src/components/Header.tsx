@@ -163,7 +163,7 @@ const Header: React.FC = () => {
                                     {displayName}
                                 </span>
                             </span>
-                            <button onClick={logout} className="btn btn-secondary">
+                            <button onClick={() => logout()} className="btn btn-secondary">
                                 Logout
                             </button>
                         </div>

@@ -1,9 +1,6 @@
 import React, { useState } from 'react';
-import { generateClient } from 'aws-amplify/data';
-import type { Schema } from '../../amplify/data/resource';
 import { useAuth } from '../AuthContext';
 
-const client = generateClient<Schema>();
 
 const Login: React.FC = () => {
     const { login } = useAuth();
@@ -18,31 +15,11 @@ const Login: React.FC = () => {
         setLoading(true);
 
         try {
-            // Query the Doctor table for matching username
-            const { data: doctors } = await client.models.Doctor.list({
-                filter: { username: { eq: username } },
-            });
-
-            if (doctors.length === 0) {
-                setError('Invalid username or password');
-                setLoading(false);
-                return;
-            }
-
-            const doctor = doctors[0];
-
-            // Check password (plaintext comparison for demo)
-            if (doctor.password !== password) {
-                setError('Invalid username or password');
-                setLoading(false);
-                return;
-            }
-
-            // Login successful
-            login(doctor.username, doctor.email);
-        } catch (err) {
+            await login({ username, password });
+            // Login successful - AuthContext state change will trigger redirect in App.tsx
+        } catch (err: any) {
             console.error('Login error:', err);
-            setError('An error occurred during login');
+            setError(err.message || 'Invalid username or password');
             setLoading(false);
         }
     };
