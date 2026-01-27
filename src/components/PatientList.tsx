@@ -47,6 +47,7 @@ const PatientList: React.FC = () => {
         try {
             const { data } = await client.models.Patient.list({
                 filter: { doctor: { eq: currentDoctor.username } },
+                limit: 1000,
             });
 
             setPatients(data as Patient[]);

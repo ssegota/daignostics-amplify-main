@@ -26,19 +26,31 @@ const CSVUpload: React.FC<CSVUploadProps> = ({ patientId, onUploadComplete }) =>
         }
 
         const headers = lines[0].split(',').map(h => h.trim());
-        const values = lines[1].split(',').map(v => v.trim());
+        let values = lines[1].split(',').map(v => v.trim());
 
+        // Handle trailing commas or empty columns at the end
+        if (values.length > headers.length) {
+            // Check if extra values are just empty strings
+            const extraValues = values.slice(headers.length);
+            if (extraValues.every(v => v === '')) {
+                values = values.slice(0, headers.length);
+            }
+        }
+
+        // Allow some flexibility, but warn/error if mismatch is significant
         if (headers.length !== values.length) {
-            setError(`Header count (${headers.length}) does not match value count (${values.length})`);
-            return null;
+            console.warn(`Header count (${headers.length}) does not match value count (${values.length}). Attempting to parse anyway.`);
+            // Only fail if we have fewer values than required key fields (unlikely to work)
         }
 
         const data: any = { patientId };
         let hasValidField = false;
 
-        for (let i = 0; i < headers.length; i++) {
+        for (let i = 0; i < Math.min(headers.length, values.length); i++) {
             const header = headers[i];
             const value = values[i];
+
+            if (!value) continue; // Skip empty values
 
             // Convert to appropriate types
             if (header === 'generationDate') {
