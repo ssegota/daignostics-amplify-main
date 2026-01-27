@@ -34,3 +34,13 @@ lambdaFunction.addToRolePolicy(
 
 // Add the User Pool ID as an environment variable for the Lambda
 lambdaFunction.addEnvironment('USER_POOL_ID', userPoolId);
+
+// Grant authenticated users permission to invoke the Lambda function
+const authenticatedRole = backend.auth.resources.authenticatedUserIamRole;
+authenticatedRole.addToPrincipalPolicy(
+  new PolicyStatement({
+    effect: Effect.ALLOW,
+    actions: ['lambda:InvokeFunction'],
+    resources: [lambdaFunction.functionArn],
+  })
+);
