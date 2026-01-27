@@ -75,25 +75,40 @@ const CSVUpload: React.FC<CSVUploadProps> = ({ patientId, patientCognitoId, onUp
     };
 
     const handleFile = async (file: File) => {
+        // Guard against multiple simultaneous uploads
+        if (uploading) {
+            console.log('CSVUpload: Already uploading, ignoring file:', file.name);
+            return;
+        }
+
+        console.log('CSVUpload: Processing file:', file.name);
         setError('');
         setUploading(true);
 
         try {
             const text = await file.text();
+            console.log('CSVUpload: File content length:', text.length);
             const experimentData = parseCSV(text);
 
             if (!experimentData) {
+                console.log('CSVUpload: parseCSV returned null');
                 setUploading(false);
                 return;
             }
 
+            console.log('CSVUpload: Creating experiment with data:', experimentData);
             // Create experiment
             await client.models.Experiment.create(experimentData);
+            console.log('CSVUpload: Experiment created successfully');
 
             setUploading(false);
+            // Reset the file input to allow uploading the same file again
+            if (inputRef.current) {
+                inputRef.current.value = '';
+            }
             onUploadComplete();
         } catch (err) {
-            console.error('Upload error:', err);
+            console.error('CSVUpload: Upload error:', err);
             setError('Failed to upload experiment data');
             setUploading(false);
         }
@@ -127,6 +142,10 @@ const CSVUpload: React.FC<CSVUploadProps> = ({ patientId, patientCognitoId, onUp
     };
 
     const handleClick = () => {
+        // Prevent clicking while uploading
+        if (uploading) {
+            return;
+        }
         inputRef.current?.click();
     };
 

@@ -558,7 +558,7 @@ textarea::placeholder {
   background-color: var(--white);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-xl);
-  max-width: 600px;
+  max-width: 800px;
   width: 90%;
   max-height: 80vh;
   overflow-y: auto;

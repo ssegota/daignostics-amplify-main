@@ -40,6 +40,10 @@ const ExperimentDetails: React.FC = () => {
     const [showPreview, setShowPreview] = useState(false);
     const [reportData, setReportData] = useState<{ analysis: string; downloadUrl: string; fileName: string } | null>(null);
     const [isSpeaking, setIsSpeaking] = useState(false);
+    const [isPaused, setIsPaused] = useState(false);
+    const [audioUrl, setAudioUrl] = useState<string | null>(null);
+    const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
+    const audioRef = React.useRef<HTMLAudioElement | null>(null);
 
     useEffect(() => {
         if (!id) return;
@@ -48,15 +52,25 @@ const ExperimentDetails: React.FC = () => {
 
     // Cleanup effect: stop audio when modal closes
     useEffect(() => {
-        if (!showPreview && isSpeaking) {
-            const audioElement = document.getElementById('polly-audio') as HTMLAudioElement;
-            if (audioElement) {
-                audioElement.pause();
-                audioElement.currentTime = 0;
+        if (!showPreview) {
+            if (audioRef.current) {
+                audioRef.current.pause();
+                audioRef.current.currentTime = 0;
+            }
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
             }
             setIsSpeaking(false);
+            setIsPaused(false);
         }
-    }, [showPreview, isSpeaking]);
+    }, [showPreview]);
+
+    // Update playback speed when changed
+    useEffect(() => {
+        if (audioRef.current) {
+            audioRef.current.playbackRate = playbackSpeed;
+        }
+    }, [playbackSpeed]);
 
     const fetchExperiment = async () => {
         if (!id) return;
@@ -161,24 +175,25 @@ const ExperimentDetails: React.FC = () => {
     const handleTextToSpeech = async () => {
         if (!reportData?.analysis) return;
 
-        // If already speaking, stop it
-        if (isSpeaking) {
-            // Stop current audio playback
-            const audioElement = document.getElementById('polly-audio') as HTMLAudioElement;
-            if (audioElement) {
-                audioElement.pause();
-                audioElement.currentTime = 0;
+        // If audio exists and is playing, this becomes a toggle
+        if (audioRef.current && audioUrl) {
+            if (isSpeaking && !isPaused) {
+                // Pause
+                audioRef.current.pause();
+                setIsPaused(true);
+                return;
+            } else if (isPaused) {
+                // Resume
+                audioRef.current.play();
+                setIsPaused(false);
+                return;
             }
-            // Also cancel Web Speech API if it's running
-            if ('speechSynthesis' in window) {
-                window.speechSynthesis.cancel();
-            }
-            setIsSpeaking(false);
-            return;
         }
 
+        // Generate new audio
         try {
             setIsSpeaking(true);
+            setIsPaused(false);
 
             // Call Lambda TTS endpoint
             const apiUrl = import.meta.env.VITE_REPORT_API_URL;
@@ -208,34 +223,69 @@ const ExperimentDetails: React.FC = () => {
                     audioArray[i] = audioData.charCodeAt(i);
                 }
                 const audioBlob = new Blob([audioArray], { type: 'audio/mpeg' });
-                const audioUrl = URL.createObjectURL(audioBlob);
+                const newAudioUrl = URL.createObjectURL(audioBlob);
 
-                // Create and play audio element
-                let audioElement = document.getElementById('polly-audio') as HTMLAudioElement;
-                if (!audioElement) {
-                    audioElement = document.createElement('audio');
-                    audioElement.id = 'polly-audio';
-                    document.body.appendChild(audioElement);
-                }
-
-                audioElement.src = audioUrl;
-                audioElement.onended = () => {
-                    setIsSpeaking(false);
+                // Revoke old URL if exists
+                if (audioUrl) {
                     URL.revokeObjectURL(audioUrl);
-                };
-                audioElement.onerror = () => {
+                }
+                setAudioUrl(newAudioUrl);
+
+                // Create audio element
+                if (!audioRef.current) {
+                    audioRef.current = new Audio();
+                }
+                audioRef.current.src = newAudioUrl;
+                audioRef.current.playbackRate = playbackSpeed;
+                audioRef.current.onended = () => {
                     setIsSpeaking(false);
+                    setIsPaused(false);
+                };
+                audioRef.current.onerror = () => {
+                    setIsSpeaking(false);
+                    setIsPaused(false);
                     console.error('Audio playback error, trying fallback...');
                     fallbackToWebSpeech();
                 };
 
-                await audioElement.play();
+                await audioRef.current.play();
             } else {
                 throw new Error('Invalid response from TTS service');
             }
         } catch (error) {
             console.log('Polly TTS failed, falling back to Web Speech API:', error);
             fallbackToWebSpeech();
+        }
+    };
+
+    const handlePauseResume = () => {
+        if (!audioRef.current) return;
+
+        if (isPaused) {
+            audioRef.current.play();
+            setIsPaused(false);
+        } else {
+            audioRef.current.pause();
+            setIsPaused(true);
+        }
+    };
+
+    const handleStop = () => {
+        if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = 0;
+        }
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+        }
+        setIsSpeaking(false);
+        setIsPaused(false);
+    };
+
+    const handleSpeedChange = (speed: number) => {
+        setPlaybackSpeed(speed);
+        if (audioRef.current) {
+            audioRef.current.playbackRate = speed;
         }
     };
 
@@ -422,17 +472,73 @@ const ExperimentDetails: React.FC = () => {
                                         </div>
                                     </div>
                                 </div>
-                                <div className="modal-footer">
+                                <div className="modal-footer" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
                                     <button className="btn btn-secondary" onClick={() => setShowPreview(false)}>
                                         Close
                                     </button>
-                                    <button
-                                        className="btn btn-primary"
-                                        onClick={handleTextToSpeech}
-                                        style={{ marginRight: 'auto' }}
-                                    >
-                                        {isSpeaking ? '⏸️ Stop' : '▶️ Play'}
-                                    </button>
+
+                                    {/* Audio Player Controls */}
+                                    <div style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.5rem',
+                                        padding: '0.5rem 1rem',
+                                        backgroundColor: 'var(--off-white)',
+                                        borderRadius: '8px',
+                                        marginRight: 'auto'
+                                    }}>
+                                        {!isSpeaking ? (
+                                            <button
+                                                className="btn btn-primary"
+                                                onClick={handleTextToSpeech}
+                                                title="Play audio"
+                                                style={{ padding: '0.5rem 0.75rem' }}
+                                            >
+                                                ▶️ Play
+                                            </button>
+                                        ) : (
+                                            <>
+                                                <button
+                                                    className="btn btn-primary"
+                                                    onClick={handlePauseResume}
+                                                    title={isPaused ? "Resume" : "Pause"}
+                                                    style={{ padding: '0.5rem 0.75rem' }}
+                                                >
+                                                    {isPaused ? '▶️' : '⏸️'}
+                                                </button>
+                                                <button
+                                                    className="btn btn-secondary"
+                                                    onClick={handleStop}
+                                                    title="Stop"
+                                                    style={{ padding: '0.5rem 0.75rem' }}
+                                                >
+                                                    ⏹️
+                                                </button>
+                                            </>
+                                        )}
+
+                                        {/* Speed Control */}
+                                        <select
+                                            value={playbackSpeed}
+                                            onChange={(e) => handleSpeedChange(parseFloat(e.target.value))}
+                                            style={{
+                                                padding: '0.4rem 0.5rem',
+                                                borderRadius: '4px',
+                                                border: '1px solid var(--medium-gray)',
+                                                fontSize: '0.85rem',
+                                                cursor: 'pointer'
+                                            }}
+                                            title="Playback speed"
+                                        >
+                                            <option value={0.5}>0.5x</option>
+                                            <option value={0.75}>0.75x</option>
+                                            <option value={1}>1x</option>
+                                            <option value={1.25}>1.25x</option>
+                                            <option value={1.5}>1.5x</option>
+                                            <option value={2}>2x</option>
+                                        </select>
+                                    </div>
+
                                     <button
                                         className="btn btn-primary"
                                         onClick={() => {
