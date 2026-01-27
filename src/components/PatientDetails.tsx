@@ -257,7 +257,7 @@ const PatientDetails: React.FC = () => {
                                     <div
                                         key={experiment.id}
                                         className="patient-card"
-                                        onClick={() => navigate(`/ experiment / ${experiment.id} `)}
+                                        onClick={() => navigate(`/experiment/${experiment.id}`)}
                                         style={{ cursor: 'pointer' }}
                                     >
                                         <div className="patient-name">
