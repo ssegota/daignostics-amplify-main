@@ -25,6 +25,7 @@ interface CreatePatientResponse {
     success: boolean;
     username?: string;
     password?: string;
+    cognitoSub?: string;
     error?: string;
 }
 
@@ -90,8 +91,12 @@ export const handler: Handler<AppSyncEvent, CreatePatientResponse> = async (even
             MessageAction: MessageActionType.SUPPRESS, // Don't send welcome email
         });
 
-        await cognitoClient.send(createUserCommand);
+        const createResponse = await cognitoClient.send(createUserCommand);
         console.log('User created successfully:', email);
+
+        // Extract the Cognito sub (userId) from the response
+        const cognitoSub = createResponse.User?.Attributes?.find(attr => attr.Name === 'sub')?.Value;
+        console.log('Cognito sub:', cognitoSub);
 
         // Set a permanent password
         const setPasswordCommand = new AdminSetUserPasswordCommand({
@@ -108,6 +113,7 @@ export const handler: Handler<AppSyncEvent, CreatePatientResponse> = async (even
             success: true,
             username: email,
             password: password,
+            cognitoSub: cognitoSub, // Return the actual Cognito user ID for authorization
         };
     } catch (error: any) {
         console.error('Error creating Cognito user:', error);

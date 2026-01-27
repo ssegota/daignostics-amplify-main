@@ -174,7 +174,7 @@ const PatientList: React.FC = () => {
     const hasActiveFilters = searchQuery || genderFilter !== 'all' || minAge || maxAge;
 
     // Create Cognito user using GraphQL mutation
-    const createCognitoUser = async (email: string, firstName: string, lastName: string): Promise<{ success: boolean; username?: string; password?: string; error?: string }> => {
+    const createCognitoUser = async (email: string, firstName: string, lastName: string): Promise<{ success: boolean; username?: string; password?: string; cognitoSub?: string; error?: string }> => {
         try {
             const { data, errors } = await client.mutations.createPatientCognitoUser({
                 email,
@@ -191,6 +191,7 @@ const PatientList: React.FC = () => {
                     success: data.success,
                     username: data.username ?? undefined,
                     password: data.password ?? undefined,
+                    cognitoSub: data.cognitoSub ?? undefined,
                     error: data.error ?? undefined,
                 };
             }
@@ -232,7 +233,7 @@ const PatientList: React.FC = () => {
                 height: parseFloat(newPatient.height),
                 weight: parseFloat(newPatient.weight),
                 email: newPatient.email,
-                cognitoId: cognitoResult.username, // The Cognito user ID (email in this case)
+                cognitoId: cognitoResult.cognitoSub || cognitoResult.username, // Use Cognito sub for proper authorization
             });
 
             if (data) {

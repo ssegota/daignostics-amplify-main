@@ -64,6 +64,7 @@ const schema = a.schema({
             success: a.boolean().required(),
             username: a.string(),
             password: a.string(),
+            cognitoSub: a.string(), // The actual Cognito user ID for authorization
             error: a.string(),
         }))
         .handler(a.handler.function(createPatientCognito))
