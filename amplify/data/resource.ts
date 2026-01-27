@@ -1,4 +1,5 @@
 import { type ClientSchema, a, defineData } from '@aws-amplify/backend';
+import { createPatientCognito } from '../functions/create-patient-cognito/resource';
 
 const schema = a.schema({
     Doctor: a
@@ -50,6 +51,23 @@ const schema = a.schema({
             allow.owner(), // Doctor (creator) has full access
             allow.ownerDefinedIn('patientCognitoId') // Patient has access
         ]),
+
+    // Custom mutation to create a Cognito user for a patient
+    createPatientCognitoUser: a
+        .mutation()
+        .arguments({
+            email: a.string().required(),
+            firstName: a.string().required(),
+            lastName: a.string().required(),
+        })
+        .returns(a.customType({
+            success: a.boolean().required(),
+            username: a.string(),
+            password: a.string(),
+            error: a.string(),
+        }))
+        .handler(a.handler.function(createPatientCognito))
+        .authorization((allow) => [allow.authenticated()]),
 });
 
 export type Schema = ClientSchema<typeof schema>;

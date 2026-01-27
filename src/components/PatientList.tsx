@@ -1,8 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { generateClient } from 'aws-amplify/data';
-import { fetchAuthSession } from 'aws-amplify/auth';
-import { LambdaClient, InvokeCommand } from '@aws-sdk/client-lambda';
 import type { Schema } from '../../amplify/data/resource';
 import { useAuth } from '../AuthContext';
 import Header from './Header';
@@ -175,36 +173,31 @@ const PatientList: React.FC = () => {
 
     const hasActiveFilters = searchQuery || genderFilter !== 'all' || minAge || maxAge;
 
-    // Invoke Lambda to create Cognito user
+    // Create Cognito user using GraphQL mutation
     const createCognitoUser = async (email: string, firstName: string, lastName: string): Promise<{ success: boolean; username?: string; password?: string; error?: string }> => {
         try {
-            const session = await fetchAuthSession();
-            const credentials = session.credentials;
-
-            if (!credentials) {
-                throw new Error('No credentials available');
-            }
-
-            const lambdaClient = new LambdaClient({
-                region: 'eu-north-1', // Match your Amplify region
-                credentials: credentials,
+            const { data, errors } = await client.mutations.createPatientCognitoUser({
+                email,
+                firstName,
+                lastName,
             });
 
-            const command = new InvokeCommand({
-                FunctionName: 'amplify-d6udhrbakha-sbs-createPatientCognitolambd-bfOfHCtTk3BK', // This will be replaced with actual function name
-                Payload: JSON.stringify({ email, firstName, lastName }),
-            });
-
-            const response = await lambdaClient.send(command);
-
-            if (response.Payload) {
-                const result = JSON.parse(new TextDecoder().decode(response.Payload));
-                return result;
+            if (errors && errors.length > 0) {
+                return { success: false, error: errors.map(e => e.message).join(', ') };
             }
 
-            return { success: false, error: 'No response from Lambda' };
+            if (data) {
+                return {
+                    success: data.success,
+                    username: data.username ?? undefined,
+                    password: data.password ?? undefined,
+                    error: data.error ?? undefined,
+                };
+            }
+
+            return { success: false, error: 'No response from server' };
         } catch (err: any) {
-            console.error('Error invoking Lambda:', err);
+            console.error('Error creating Cognito user:', err);
             return { success: false, error: err.message || 'Failed to create Cognito user' };
         }
     };
