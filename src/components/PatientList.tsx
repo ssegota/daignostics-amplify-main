@@ -24,6 +24,7 @@ const PatientList: React.FC = () => {
     const [patients, setPatients] = useState<Patient[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
     const [showAddModal, setShowAddModal] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [newPatient, setNewPatient] = useState({
@@ -109,6 +110,24 @@ const PatientList: React.FC = () => {
                         </button>
                     </div>
 
+                    {/* Search/Filter Input */}
+                    <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                        <input
+                            type="text"
+                            placeholder="🔍 Search patients by name..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            style={{
+                                width: '100%',
+                                padding: '0.75rem 1rem',
+                                fontSize: '1rem',
+                                border: '2px solid var(--light-gray)',
+                                borderRadius: '8px',
+                                transition: 'border-color 0.2s',
+                            }}
+                        />
+                    </div>
+
                     {loading ? (
                         <div className="loading-container">
                             <span className="spinner" style={{ width: '40px', height: '40px' }}></span>
@@ -127,23 +146,53 @@ const PatientList: React.FC = () => {
                             <h3>No patients yet</h3>
                             <p>You don't have any patients assigned to you.</p>
                         </div>
-                    ) : (
-                        <div className="patient-grid">
-                            {patients.map((patient) => (
-                                <div
-                                    key={patient.id}
-                                    className="patient-card"
-                                    onClick={() => navigate(`/patient/${patient.id}`)}
-                                    style={{ cursor: 'pointer' }}
-                                >
-                                    <div className="patient-name">
-                                        {patient.firstName} {patient.lastName}
-                                    </div>
-                                    <div className="patient-info">Patient ID: {patient.id.slice(0, 8)}</div>
+                    ) : (() => {
+                        // Filter patients based on search query
+                        const filteredPatients = patients.filter(patient => {
+                            if (!searchQuery.trim()) return true;
+                            const query = searchQuery.toLowerCase();
+                            return (
+                                patient.firstName.toLowerCase().includes(query) ||
+                                patient.lastName.toLowerCase().includes(query) ||
+                                `${patient.firstName} ${patient.lastName}`.toLowerCase().includes(query) ||
+                                patient.id.toLowerCase().includes(query)
+                            );
+                        });
+
+                        if (filteredPatients.length === 0) {
+                            return (
+                                <div className="empty-state">
+                                    <div className="empty-state-icon">🔍</div>
+                                    <h3>No matching patients</h3>
+                                    <p>No patients match "{searchQuery}"</p>
+                                    <button
+                                        onClick={() => setSearchQuery('')}
+                                        className="btn btn-secondary mt-md"
+                                    >
+                                        Clear Search
+                                    </button>
                                 </div>
-                            ))}
-                        </div>
-                    )}
+                            );
+                        }
+
+                        return (
+                            <div className="patient-grid">
+                                {filteredPatients.map((patient) => (
+                                    <div
+                                        key={patient.id}
+                                        className="patient-card"
+                                        onClick={() => navigate(`/patient/${patient.id}`)}
+                                        style={{ cursor: 'pointer' }}
+                                    >
+                                        <div className="patient-name">
+                                            {patient.firstName} {patient.lastName}
+                                        </div>
+                                        <div className="patient-info">Patient ID: {patient.id.slice(0, 8)}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        );
+                    })()}
                 </div>
             </div>
             {showAddModal && (
