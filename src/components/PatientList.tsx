@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { generateClient } from 'aws-amplify/data';
+import { fetchAuthSession } from 'aws-amplify/auth';
+import { LambdaClient, InvokeCommand } from '@aws-sdk/client-lambda';
 import type { Schema } from '../../amplify/data/resource';
 import { useAuth } from '../AuthContext';
 import Header from './Header';
@@ -17,9 +19,18 @@ interface Patient {
     insuranceNumber?: string;
     height?: number;
     weight?: number;
+    email?: string;
+    cognitoId?: string;
 }
 
 type SortOption = 'name-asc' | 'name-desc' | 'age-asc' | 'age-desc' | 'newest' | 'oldest';
+
+interface CreatedCredentials {
+    username: string;
+    password: string;
+    email: string;
+    patientName: string;
+}
 
 const PatientList: React.FC = () => {
     const { currentUser } = useAuth();
@@ -31,6 +42,11 @@ const PatientList: React.FC = () => {
     const [showAddModal, setShowAddModal] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
+    // Credentials modal state
+    const [showCredentialsModal, setShowCredentialsModal] = useState(false);
+    const [createdCredentials, setCreatedCredentials] = useState<CreatedCredentials | null>(null);
+    const [copiedField, setCopiedField] = useState<string | null>(null);
+
     // Filter states
     const [genderFilter, setGenderFilter] = useState<string>('all');
     const [minAge, setMinAge] = useState<string>('');
@@ -40,6 +56,7 @@ const PatientList: React.FC = () => {
     const [newPatient, setNewPatient] = useState({
         firstName: '',
         lastName: '',
+        email: '',
         dateOfBirth: '',
         gender: '',
         insuranceNumber: '',
@@ -158,12 +175,60 @@ const PatientList: React.FC = () => {
 
     const hasActiveFilters = searchQuery || genderFilter !== 'all' || minAge || maxAge;
 
+    // Invoke Lambda to create Cognito user
+    const createCognitoUser = async (email: string, firstName: string, lastName: string): Promise<{ success: boolean; username?: string; password?: string; error?: string }> => {
+        try {
+            const session = await fetchAuthSession();
+            const credentials = session.credentials;
+
+            if (!credentials) {
+                throw new Error('No credentials available');
+            }
+
+            const lambdaClient = new LambdaClient({
+                region: 'eu-north-1', // Match your Amplify region
+                credentials: credentials,
+            });
+
+            const command = new InvokeCommand({
+                FunctionName: 'amplify-d6udhrbakha-sbs-createPatientCognitolambd-bfOfHCtTk3BK', // This will be replaced with actual function name
+                Payload: JSON.stringify({ email, firstName, lastName }),
+            });
+
+            const response = await lambdaClient.send(command);
+
+            if (response.Payload) {
+                const result = JSON.parse(new TextDecoder().decode(response.Payload));
+                return result;
+            }
+
+            return { success: false, error: 'No response from Lambda' };
+        } catch (err: any) {
+            console.error('Error invoking Lambda:', err);
+            return { success: false, error: err.message || 'Failed to create Cognito user' };
+        }
+    };
+
     const handleAddPatient = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!currentUser) return;
 
         setSubmitting(true);
         try {
+            // First, create the Cognito user
+            const cognitoResult = await createCognitoUser(
+                newPatient.email,
+                newPatient.firstName,
+                newPatient.lastName
+            );
+
+            if (!cognitoResult.success) {
+                alert(`Failed to create login credentials: ${cognitoResult.error}`);
+                setSubmitting(false);
+                return;
+            }
+
+            // Then create the Patient record with Cognito ID
             const { data } = await client.models.Patient.create({
                 firstName: newPatient.firstName,
                 lastName: newPatient.lastName,
@@ -173,14 +238,28 @@ const PatientList: React.FC = () => {
                 insuranceNumber: newPatient.insuranceNumber,
                 height: parseFloat(newPatient.height),
                 weight: parseFloat(newPatient.weight),
+                email: newPatient.email,
+                cognitoId: cognitoResult.username, // The Cognito user ID (email in this case)
             });
 
             if (data) {
                 setPatients([...patients, data as Patient]);
                 setShowAddModal(false);
+
+                // Show credentials modal
+                setCreatedCredentials({
+                    username: cognitoResult.username!,
+                    password: cognitoResult.password!,
+                    email: newPatient.email,
+                    patientName: `${newPatient.firstName} ${newPatient.lastName}`,
+                });
+                setShowCredentialsModal(true);
+
+                // Reset form
                 setNewPatient({
                     firstName: '',
                     lastName: '',
+                    email: '',
                     dateOfBirth: '',
                     gender: '',
                     insuranceNumber: '',
@@ -194,6 +273,27 @@ const PatientList: React.FC = () => {
         } finally {
             setSubmitting(false);
         }
+    };
+
+    const copyToClipboard = async (text: string, field: string) => {
+        await navigator.clipboard.writeText(text);
+        setCopiedField(field);
+        setTimeout(() => setCopiedField(null), 2000);
+    };
+
+    const generateMailtoLink = () => {
+        if (!createdCredentials) return '#';
+        const subject = encodeURIComponent('Your dAIgnostics Patient Portal Login Credentials');
+        const body = encodeURIComponent(
+            `Dear ${createdCredentials.patientName},\n\n` +
+            `Your login credentials for the dAIgnostics Patient Portal are:\n\n` +
+            `Username: ${createdCredentials.username}\n` +
+            `Password: ${createdCredentials.password}\n\n` +
+            `Please login at: https://test.d36qbrjf0v0l38.amplifyapp.com\n\n` +
+            `Best regards,\n` +
+            `Your Healthcare Provider`
+        );
+        return `mailto:${createdCredentials.email}?subject=${subject}&body=${body}`;
     };
 
     // Sidebar styles
@@ -393,6 +493,8 @@ const PatientList: React.FC = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Add Patient Modal */}
             {showAddModal && (
                 <div className="modal-overlay">
                     <div className="modal-content">
@@ -402,23 +504,38 @@ const PatientList: React.FC = () => {
                         </div>
                         <form onSubmit={handleAddPatient}>
                             <div className="modal-body">
-                                <div className="form-group">
-                                    <label>First Name</label>
-                                    <input
-                                        type="text"
-                                        required
-                                        value={newPatient.firstName}
-                                        onChange={(e) => setNewPatient({ ...newPatient, firstName: e.target.value })}
-                                    />
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                    <div className="form-group">
+                                        <label>First Name</label>
+                                        <input
+                                            type="text"
+                                            required
+                                            value={newPatient.firstName}
+                                            onChange={(e) => setNewPatient({ ...newPatient, firstName: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Last Name</label>
+                                        <input
+                                            type="text"
+                                            required
+                                            value={newPatient.lastName}
+                                            onChange={(e) => setNewPatient({ ...newPatient, lastName: e.target.value })}
+                                        />
+                                    </div>
                                 </div>
                                 <div className="form-group">
-                                    <label>Last Name</label>
+                                    <label>Email (for Patient Portal Login)</label>
                                     <input
-                                        type="text"
+                                        type="email"
                                         required
-                                        value={newPatient.lastName}
-                                        onChange={(e) => setNewPatient({ ...newPatient, lastName: e.target.value })}
+                                        placeholder="patient@example.com"
+                                        value={newPatient.email}
+                                        onChange={(e) => setNewPatient({ ...newPatient, email: e.target.value })}
                                     />
+                                    <small style={{ color: 'var(--dark-gray)', marginTop: '0.25rem', display: 'block' }}>
+                                        This email will be used as the patient's login username.
+                                    </small>
                                 </div>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                                     <div className="form-group">
@@ -480,10 +597,81 @@ const PatientList: React.FC = () => {
                                     Cancel
                                 </button>
                                 <button type="submit" className="btn btn-primary" disabled={submitting}>
-                                    {submitting ? 'Adding...' : 'Add Patient'}
+                                    {submitting ? 'Creating Account...' : 'Add Patient'}
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Credentials Modal */}
+            {showCredentialsModal && createdCredentials && (
+                <div className="modal-overlay">
+                    <div className="modal-content" style={{ maxWidth: '500px' }}>
+                        <div className="modal-header">
+                            <h2>✅ Patient Account Created</h2>
+                            <button onClick={() => setShowCredentialsModal(false)} className="modal-close">×</button>
+                        </div>
+                        <div className="modal-body">
+                            <p style={{ marginBottom: '1.5rem' }}>
+                                Login credentials have been created for <strong>{createdCredentials.patientName}</strong>.
+                                Please share these credentials with the patient securely.
+                            </p>
+
+                            <div style={{ backgroundColor: '#f8f9fa', padding: '1.5rem', borderRadius: '12px', marginBottom: '1rem' }}>
+                                <div style={{ marginBottom: '1rem' }}>
+                                    <label style={{ fontWeight: 600, display: 'block', marginBottom: '0.25rem', color: 'var(--dark-gray)' }}>Username (Email)</label>
+                                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                        <code style={{ flex: 1, backgroundColor: 'white', padding: '0.75rem', borderRadius: '6px', border: '1px solid #ddd' }}>
+                                            {createdCredentials.username}
+                                        </code>
+                                        <button
+                                            onClick={() => copyToClipboard(createdCredentials.username, 'username')}
+                                            className="btn btn-secondary btn-sm"
+                                        >
+                                            {copiedField === 'username' ? '✓ Copied' : 'Copy'}
+                                        </button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label style={{ fontWeight: 600, display: 'block', marginBottom: '0.25rem', color: 'var(--dark-gray)' }}>Password</label>
+                                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                        <code style={{ flex: 1, backgroundColor: 'white', padding: '0.75rem', borderRadius: '6px', border: '1px solid #ddd' }}>
+                                            {createdCredentials.password}
+                                        </code>
+                                        <button
+                                            onClick={() => copyToClipboard(createdCredentials.password, 'password')}
+                                            className="btn btn-secondary btn-sm"
+                                        >
+                                            {copiedField === 'password' ? '✓ Copied' : 'Copy'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style={{
+                                backgroundColor: '#fff3cd',
+                                border: '1px solid #ffc107',
+                                borderRadius: '8px',
+                                padding: '1rem',
+                                marginBottom: '1rem'
+                            }}>
+                                <strong>⚠️ Important:</strong> This password will not be shown again. Make sure to save it or share it with the patient now.
+                            </div>
+                        </div>
+                        <div className="modal-footer" style={{ justifyContent: 'space-between' }}>
+                            <a
+                                href={generateMailtoLink()}
+                                className="btn btn-secondary"
+                                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', textDecoration: 'none' }}
+                            >
+                                📧 Email to Patient
+                            </a>
+                            <button onClick={() => setShowCredentialsModal(false)} className="btn btn-primary">
+                                Done
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
