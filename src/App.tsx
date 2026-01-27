@@ -10,8 +10,10 @@ import './index.css';
 
 Amplify.configure(outputs);
 
+import PatientDashboard from './components/PatientDashboard';
+
 function AppContent() {
-  const { currentDoctor, isLoading } = useAuth();
+  const { currentUser, isLoading } = useAuth();
 
   if (isLoading) {
     return (
@@ -21,10 +23,21 @@ function AppContent() {
     );
   }
 
-  if (!currentDoctor) {
+  if (!currentUser) {
     return <Login />;
   }
 
+  if (currentUser.role === 'patient') {
+    return (
+      <Routes>
+        <Route path="/" element={<PatientDashboard />} />
+        <Route path="/experiment/:id" element={<ExperimentDetails />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    );
+  }
+
+  // Doctor Routes
   return (
     <Routes>
       <Route path="/" element={<PatientList />} />

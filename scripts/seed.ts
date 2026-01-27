@@ -91,6 +91,7 @@ function generateExperiment(patientId: string) {
 
     return {
         patientId,
+        patientCognitoId: '', // To be filled in later
         peakCounts: Math.floor(randomFloat(10, 100)),
         amplitude: randomFloat(0.5, 10.0),
         auc: randomFloat(100, 1000),
@@ -101,6 +102,53 @@ function generateExperiment(patientId: string) {
         kurtosis: randomFloat(1, 10),
         generationDate: experimentDate.toISOString(),
     };
+}
+
+async function createCognitoUser(email: string, givenName: string, familyName: string, password = 'Password123!'): Promise<string | null> {
+    try {
+        console.log(`   - Creating Cognito user for ${email}...`);
+
+        // Try delete first (cleanup)
+        try {
+            await cognitoClient.send(new AdminDeleteUserCommand({
+                UserPoolId: authConfig.user_pool_id,
+                Username: email
+            }));
+        } catch (e) { }
+
+        const createUserResponse = await cognitoClient.send(new AdminCreateUserCommand({
+            UserPoolId: authConfig.user_pool_id,
+            Username: email,
+            UserAttributes: [
+                { Name: 'email', Value: email },
+                { Name: 'email_verified', Value: 'true' },
+                { Name: 'given_name', Value: givenName },
+                { Name: 'family_name', Value: familyName }
+            ],
+            MessageAction: 'SUPPRESS'
+        }));
+
+        await cognitoClient.send(new AdminSetUserPasswordCommand({
+            UserPoolId: authConfig.user_pool_id,
+            Username: email,
+            Password: password,
+            Permanent: true
+        }));
+
+        // Fetch the user to get the 'sub' (User ID)
+        // Actually, AdminCreateUser returns the user object with attributes
+        const subAttribute = createUserResponse.User?.Attributes?.find(attr => attr.Name === 'sub');
+        if (subAttribute) {
+            return subAttribute.Value || null;
+        }
+
+        // Fallback: we might need to fetch user if sub isn't in response (usually it is)
+        return null;
+
+    } catch (error) {
+        console.error(`   ❌ Error creating Cognito user ${email}:`, error);
+        return null;
+    }
 }
 
 async function cleanUpDoctorData(doctorUsername: string) {
@@ -237,10 +285,28 @@ async function seedDatabase() {
         const patientCount = Math.floor(Math.random() * 6) + 3; // 3-8 patients
 
         for (let i = 0; i < patientCount; i++) {
+            const pFirstName = getRandomElement(firstNames);
+            const pLastName = getRandomElement(lastNames);
+            // Construct a fake email for the patient
+            const pEmail = `${pFirstName.toLowerCase()}.${pLastName.toLowerCase()}.${Date.now()}@daignostics.info`;
+
+            // 5a. Create Cognito User for Patient
+            // NOTE: In a real app, AdminCreateUser usually returns the SUB.
+            // However, to be 100% sure we have the sub matching what signIn returns, we could sign in.
+            // But AdminCreateUser output should contain Attributes including 'sub'.
+            const patientSub = await createCognitoUser(pEmail, pFirstName, pLastName, 'Password123!');
+
+            if (!patientSub) {
+                console.log(`   ⚠️ Skipping patient creation because Cognito user failed.`);
+                continue;
+            }
+
             const patientData = {
-                firstName: getRandomElement(firstNames),
-                lastName: getRandomElement(lastNames),
-                doctor: userId, // Link to the ACTUAL Cognito User Sub
+                firstName: pFirstName,
+                lastName: pLastName,
+                email: pEmail,
+                cognitoId: patientSub,
+                doctor: userId, // Link to the ACTUAL Cognito User Sub (Owner)
                 dateOfBirth: randomDate(new Date(1950, 0, 1), new Date(2005, 0, 1)),
                 gender: getRandomElement(['Male', 'Female']),
                 insuranceNumber: randomString(10),
@@ -255,7 +321,9 @@ async function seedDatabase() {
                 if (Math.random() > 0.2) { // 80% chance of having experiments
                     const experimentCount = Math.floor(Math.random() * 5) + 2;
                     for (let j = 0; j < experimentCount; j++) {
-                        await client.models.Experiment.create(generateExperiment(newPatient.data.id));
+                        const expData = generateExperiment(newPatient.data.id);
+                        expData.patientCognitoId = patientSub; // Grant access to patient
+                        await client.models.Experiment.create(expData);
                     }
                 }
             }

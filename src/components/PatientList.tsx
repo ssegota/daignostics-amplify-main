@@ -22,7 +22,7 @@ interface Patient {
 type SortOption = 'name-asc' | 'name-desc' | 'age-asc' | 'age-desc' | 'newest' | 'oldest';
 
 const PatientList: React.FC = () => {
-    const { currentDoctor } = useAuth();
+    const { currentUser } = useAuth();
     const navigate = useNavigate();
     const [patients, setPatients] = useState<Patient[]>([]);
     const [loading, setLoading] = useState(true);
@@ -49,17 +49,17 @@ const PatientList: React.FC = () => {
 
     useEffect(() => {
         fetchPatients();
-    }, [currentDoctor]);
+    }, [currentUser]);
 
     const fetchPatients = async () => {
-        if (!currentDoctor) return;
+        if (!currentUser) return;
 
         setLoading(true);
         setError('');
 
         try {
             const { data } = await client.models.Patient.list({
-                filter: { doctor: { eq: currentDoctor.username } },
+                filter: { doctor: { eq: currentUser.username } },
                 limit: 1000,
             });
 
@@ -160,14 +160,14 @@ const PatientList: React.FC = () => {
 
     const handleAddPatient = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!currentDoctor) return;
+        if (!currentUser) return;
 
         setSubmitting(true);
         try {
             const { data } = await client.models.Patient.create({
                 firstName: newPatient.firstName,
                 lastName: newPatient.lastName,
-                doctor: currentDoctor.username,
+                doctor: currentUser.username,
                 dateOfBirth: newPatient.dateOfBirth,
                 gender: newPatient.gender || undefined,
                 insuranceNumber: newPatient.insuranceNumber,

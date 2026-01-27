@@ -31,7 +31,7 @@ interface MetricInfo {
 const ExperimentDetails: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const { currentDoctor } = useAuth();
+    const { currentUser } = useAuth();
     const [experiment, setExperiment] = useState<Experiment | null>(null);
     const [patientName, setPatientName] = useState<string>('');
     const [loading, setLoading] = useState(true);
@@ -89,7 +89,7 @@ const ExperimentDetails: React.FC = () => {
     };
 
     const handleGenerateReport = async () => {
-        if (!experiment || !currentDoctor) return;
+        if (!experiment || !currentUser) return;
 
         setGenerating(true);
         setError('');
@@ -102,8 +102,11 @@ const ExperimentDetails: React.FC = () => {
             }
 
             // Prepare request payload
+            // If current user is doctor, use their username. If patient, use the doctor ID from the patient record (if available) or currentUser.username as fallback
+            const doctorUsername = currentUser.role === 'doctor' ? currentUser.username : currentUser.username;
+
             const payload = {
-                doctorUsername: currentDoctor.username,
+                doctorUsername: doctorUsername,
                 patientName: patientName || 'Unknown Patient',
                 measurements: {
                     peakCounts: experiment.peakCounts,

@@ -18,7 +18,7 @@ interface Doctor {
 }
 
 const Header: React.FC = () => {
-    const { currentDoctor, logout } = useAuth();
+    const { currentUser, logout } = useAuth();
     const [doctorDetails, setDoctorDetails] = useState<Doctor | null>(null);
     const [showEditModal, setShowEditModal] = useState(false);
     const [submitting, setSubmitting] = useState(false);
@@ -35,33 +35,33 @@ const Header: React.FC = () => {
     });
 
     useEffect(() => {
-        if (currentDoctor) {
+        if (currentUser?.role === 'doctor') {
             fetchDoctorDetails();
         }
-    }, [currentDoctor]);
+    }, [currentUser]);
 
     const fetchDoctorDetails = async () => {
-        if (!currentDoctor) return;
+        if (!currentUser) return;
         try {
-            console.log('Fetching doctor details for:', currentDoctor.username);
+            console.log('Fetching doctor details for:', currentUser.username);
             // Use list with filter since username is not the primary key (id is auto-generated)
             const { data } = await client.models.Doctor.list({
-                filter: { username: { eq: currentDoctor.username } }
+                filter: { username: { eq: currentUser.username } }
             });
             console.log('Doctor data received:', data);
             if (data && data.length > 0) {
                 setDoctorDetails(data[0] as any);
                 setForm(data[0] as any);
             } else {
-                console.warn('No doctor data found, using currentDoctor as fallback');
-                // Use currentDoctor as fallback
+                console.warn('No doctor data found, using currentUser as fallback');
+                // Use currentUser as fallback
                 setDoctorDetails({
-                    username: currentDoctor.username,
-                    email: currentDoctor.email || '',
+                    username: currentUser.username,
+                    email: '', // Email might not be available in currentUser object instantly
                 } as Doctor);
                 setForm({
-                    username: currentDoctor.username,
-                    email: currentDoctor.email || '',
+                    username: currentUser.username,
+                    email: '',
                     firstName: '',
                     lastName: '',
                     primaryInstitution: '',
@@ -72,10 +72,9 @@ const Header: React.FC = () => {
             }
         } catch (err) {
             console.error('Error fetching doctor details:', err);
-            // Still set basic info from currentDoctor
             setDoctorDetails({
-                username: currentDoctor.username,
-                email: currentDoctor.email || '',
+                username: currentUser.username,
+                email: '',
             } as Doctor);
         }
     };
@@ -84,11 +83,11 @@ const Header: React.FC = () => {
         // Always allow opening the modal - use whatever data we have
         if (doctorDetails) {
             setForm(doctorDetails);
-        } else if (currentDoctor) {
+        } else if (currentUser) {
             // Fallback to basic info
             setForm({
-                username: currentDoctor.username,
-                email: currentDoctor.email || '',
+                username: currentUser.username,
+                email: '',
                 firstName: '',
                 lastName: '',
                 primaryInstitution: '',
@@ -139,7 +138,9 @@ const Header: React.FC = () => {
 
     const displayName = doctorDetails?.lastName
         ? `Dr. ${doctorDetails.lastName}`
-        : `Dr. ${currentDoctor?.username}`;
+        : currentUser?.role === 'patient'
+            ? 'Patient'
+            : `Dr. ${currentUser?.username}`;
 
     return (
         <>

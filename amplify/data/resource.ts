@@ -18,6 +18,8 @@ const schema = a.schema({
         .model({
             firstName: a.string().required(),
             lastName: a.string().required(),
+            email: a.string(),
+            cognitoId: a.string(),
             doctor: a.string().required(),
             dateOfBirth: a.string(),
             gender: a.string(),
@@ -25,11 +27,15 @@ const schema = a.schema({
             height: a.float(),
             weight: a.float(),
         })
-        .authorization((allow) => [allow.owner()]),
+        .authorization((allow) => [
+            allow.owner(), // Doctor (creator) has full access
+            allow.ownerDefinedIn('cognitoId') // Patient (assigned via cognitoId) has full access (read/write)
+        ]),
 
     Experiment: a
         .model({
             patientId: a.string().required(),
+            patientCognitoId: a.string(), // Field to grant access to the patient
             peakCounts: a.float().required(),
             amplitude: a.float().required(),
             auc: a.float().required(),
@@ -40,7 +46,10 @@ const schema = a.schema({
             kurtosis: a.float().required(),
             generationDate: a.datetime().required(),
         })
-        .authorization((allow) => [allow.owner()]),
+        .authorization((allow) => [
+            allow.owner(), // Doctor (creator) has full access
+            allow.ownerDefinedIn('patientCognitoId') // Patient has access
+        ]),
 });
 
 export type Schema = ClientSchema<typeof schema>;

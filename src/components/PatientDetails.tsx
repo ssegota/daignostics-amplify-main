@@ -41,7 +41,7 @@ interface Doctor {
 const PatientDetails: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const { currentDoctor } = useAuth();
+    const { currentUser } = useAuth();
     const [patient, setPatient] = useState<Patient | null>(null);
     const [experiments, setExperiments] = useState<Experiment[]>([]);
     const [loading, setLoading] = useState(true);
@@ -378,7 +378,7 @@ const PatientDetails: React.FC = () => {
                                     >
                                         <option value="">-- Select Doctor --</option>
                                         {doctors
-                                            .filter(d => d.username !== currentDoctor?.username)
+                                            .filter(d => d.username !== currentUser?.username)
                                             .map(doctor => (
                                                 <option key={doctor.username} value={doctor.username}>
                                                     Dr. {doctor.username} ({doctor.email})

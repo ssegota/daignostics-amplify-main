@@ -9,6 +9,7 @@ const Login: React.FC = () => {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+    const [loginType, setLoginType] = useState<'doctor' | 'patient'>('doctor');
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -54,18 +55,22 @@ const Login: React.FC = () => {
                             <a href="https://daignostics.info" target="_blank" rel="noopener noreferrer">
                                 <img src="/logo.svg" alt="dAIgnostics" style={{ height: '48px', marginBottom: '1rem' }} />
                             </a>
-                            <p className="login-subtitle">Doctor Portal</p>
+                            <p className="login-subtitle">
+                                {loginType === 'doctor' ? 'Doctor Portal' : 'Patient Portal'}
+                            </p>
                         </div>
 
                         <form onSubmit={handleSubmit}>
                             <div className="form-group">
-                                <label htmlFor="username">Username</label>
+                                <label htmlFor="username">
+                                    {loginType === 'doctor' ? 'Username or Email' : 'Email'}
+                                </label>
                                 <input
                                     type="text"
                                     id="username"
                                     value={username}
                                     onChange={(e) => setUsername(e.target.value)}
-                                    placeholder="Enter your username"
+                                    placeholder={loginType === 'doctor' ? "Enter your username" : "Enter your email"}
                                     required
                                     disabled={loading}
                                 />
@@ -129,6 +134,34 @@ const Login: React.FC = () => {
                                     'Login'
                                 )}
                             </button>
+
+                            <div style={{ marginTop: '1.5rem', textAlign: 'center', fontSize: '0.9rem' }}>
+                                {loginType === 'doctor' ? (
+                                    <p>
+                                        Are you a patient?{' '}
+                                        <button
+                                            type="button"
+                                            className="link-button"
+                                            onClick={() => setLoginType('patient')}
+                                            style={{ background: 'none', border: 'none', color: 'var(--primary-color)', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}
+                                        >
+                                            Login as Patient
+                                        </button>
+                                    </p>
+                                ) : (
+                                    <p>
+                                        Are you a doctor?{' '}
+                                        <button
+                                            type="button"
+                                            className="link-button"
+                                            onClick={() => setLoginType('doctor')}
+                                            style={{ background: 'none', border: 'none', color: 'var(--primary-color)', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}
+                                        >
+                                            Login as Doctor
+                                        </button>
+                                    </p>
+                                )}
+                            </div>
                         </form>
                     </div>
                 </div>
