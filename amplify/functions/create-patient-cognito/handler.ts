@@ -8,10 +8,17 @@ import {
 
 const cognitoClient = new CognitoIdentityProviderClient({});
 
-interface CreatePatientEvent {
-    email: string;
-    firstName: string;
-    lastName: string;
+// AppSync invokes Lambda with arguments nested under 'arguments' property
+interface AppSyncEvent {
+    arguments?: {
+        email: string;
+        firstName: string;
+        lastName: string;
+    };
+    // Direct invocation format
+    email?: string;
+    firstName?: string;
+    lastName?: string;
 }
 
 interface CreatePatientResponse {
@@ -45,10 +52,12 @@ function generatePassword(): string {
     return password.split('').sort(() => Math.random() - 0.5).join('');
 }
 
-export const handler: Handler<CreatePatientEvent, CreatePatientResponse> = async (event) => {
+export const handler: Handler<AppSyncEvent, CreatePatientResponse> = async (event) => {
     console.log('Received event:', JSON.stringify(event, null, 2));
 
-    const { email, firstName, lastName } = event;
+    // Handle both AppSync invocation (event.arguments) and direct invocation
+    const args = event.arguments || event;
+    const { email, firstName, lastName } = args;
     const userPoolId = process.env.USER_POOL_ID;
 
     if (!email || !firstName || !lastName) {
