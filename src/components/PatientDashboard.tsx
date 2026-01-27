@@ -63,11 +63,11 @@ const PatientDashboard: React.FC = () => {
                         <table className="data-table" style={{ width: '100%' }}>
                             <thead>
                                 <tr>
-                                    <th>Date</th>
-                                    <th>Peak Counts</th>
-                                    <th>Amplitude</th>
-                                    <th>Status</th>
-                                    <th>Actions</th>
+                                    <th style={{ textAlign: 'center', padding: '1rem' }}>Date</th>
+                                    <th style={{ textAlign: 'center', padding: '1rem' }}>Peak Counts</th>
+                                    <th style={{ textAlign: 'center', padding: '1rem' }}>Amplitude</th>
+                                    <th style={{ textAlign: 'center', padding: '1rem' }}>Status</th>
+                                    <th style={{ textAlign: 'center', padding: '1rem' }}>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -76,15 +76,15 @@ const PatientDashboard: React.FC = () => {
                                         .sort((a, b) => new Date(b.generationDate).getTime() - new Date(a.generationDate).getTime())
                                         .map((exp) => (
                                             <tr key={exp.id}>
-                                                <td style={{ fontWeight: '500' }}>{new Date(exp.generationDate).toLocaleDateString()}</td>
-                                                <td>{exp.peakCounts.toFixed(1)}</td>
-                                                <td>{exp.amplitude.toFixed(2)}</td>
-                                                <td>
+                                                <td style={{ fontWeight: '500', textAlign: 'center' }}>{new Date(exp.generationDate).toLocaleDateString()}</td>
+                                                <td style={{ textAlign: 'center' }}>{exp.peakCounts.toFixed(1)}</td>
+                                                <td style={{ textAlign: 'center' }}>{exp.amplitude.toFixed(2)}</td>
+                                                <td style={{ textAlign: 'center' }}>
                                                     <span className={`status-badge ${exp.snr > 10 ? 'status-completed' : 'status-pending'}`}>
                                                         {exp.snr > 10 ? 'Complete' : 'Processing'}
                                                     </span>
                                                 </td>
-                                                <td>
+                                                <td style={{ textAlign: 'center' }}>
                                                     <button
                                                         className="btn btn-sm btn-primary"
                                                         onClick={() => navigate(`/experiment/${exp.id}`)}

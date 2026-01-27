@@ -20,6 +20,7 @@ interface Doctor {
 const Header: React.FC = () => {
     const { currentUser, logout } = useAuth();
     const [doctorDetails, setDoctorDetails] = useState<Doctor | null>(null);
+    const [patientDetails, setPatientDetails] = useState<{ firstName: string; lastName: string } | null>(null);
     const [showEditModal, setShowEditModal] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [form, setForm] = useState<Doctor>({
@@ -37,8 +38,25 @@ const Header: React.FC = () => {
     useEffect(() => {
         if (currentUser?.role === 'doctor') {
             fetchDoctorDetails();
+        } else if (currentUser?.role === 'patient') {
+            fetchPatientDetails();
         }
     }, [currentUser]);
+
+    const fetchPatientDetails = async () => {
+        if (!currentUser) return;
+        try {
+            // Patient username from Cognito is stored in cognitoId field in Patient model
+            const { data } = await client.models.Patient.list({
+                filter: { cognitoId: { eq: currentUser.username } }
+            });
+            if (data.length > 0) {
+                setPatientDetails(data[0]);
+            }
+        } catch (err) {
+            console.error('Error fetching patient details:', err);
+        }
+    };
 
     const fetchDoctorDetails = async () => {
         if (!currentUser) return;
@@ -139,7 +157,7 @@ const Header: React.FC = () => {
     const displayName = doctorDetails?.lastName
         ? `Dr. ${doctorDetails.lastName}`
         : currentUser?.role === 'patient'
-            ? 'Patient'
+            ? (patientDetails ? `${patientDetails.firstName} ${patientDetails.lastName}` : 'Patient')
             : `Dr. ${currentUser?.username}`;
 
     return (
