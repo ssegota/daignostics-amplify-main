@@ -51,7 +51,9 @@ const Login: React.FC = () => {
         <div className="login-container">
             <div className="login-card">
                 <div className="login-header">
-                    <h1 className="login-title">dAIgnostics</h1>
+                    <a href="https://daignostics.info" target="_blank" rel="noopener noreferrer">
+                        <img src="/logo.svg" alt="dAIgnostics" style={{ height: '48px', marginBottom: '1rem' }} />
+                    </a>
                     <p className="login-subtitle">Doctor Portal</p>
                 </div>
 
