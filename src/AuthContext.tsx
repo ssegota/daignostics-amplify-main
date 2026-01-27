@@ -84,6 +84,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
 
     const login = async (input: SignInInput) => {
+        // Ensure any existing session is cleared before attempting login
+        try {
+            await signOut();
+        } catch (e) {
+            // Ignore error if not signed in
+        }
+
         const { isSignedIn, nextStep } = await signIn(input);
         if (isSignedIn) {
             const user = await getCurrentUser();
