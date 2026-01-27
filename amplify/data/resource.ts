@@ -6,6 +6,12 @@ const schema = a.schema({
             username: a.id().required(),
             password: a.string().required(),
             email: a.string().required(),
+            firstName: a.string(),
+            lastName: a.string(),
+            primaryInstitution: a.string(),
+            primaryInstitutionAddress: a.string(),
+            secondaryInstitution: a.string(),
+            secondaryInstitutionAddress: a.string(),
         })
         .authorization((allow) => [allow.publicApiKey()]),
 

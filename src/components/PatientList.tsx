@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { generateClient } from 'aws-amplify/data';
 import type { Schema } from '../../amplify/data/resource';
 import { useAuth } from '../AuthContext';
+import Header from './Header';
 
 const client = generateClient<Schema>();
 
@@ -18,7 +19,7 @@ interface Patient {
 }
 
 const PatientList: React.FC = () => {
-    const { currentDoctor, logout } = useAuth();
+    const { currentDoctor } = useAuth();
     const navigate = useNavigate();
     const [patients, setPatients] = useState<Patient[]>([]);
     const [loading, setLoading] = useState(true);
@@ -97,21 +98,7 @@ const PatientList: React.FC = () => {
 
     return (
         <>
-            <header className="header">
-                <div className="container">
-                    <div className="header-content">
-                        <a href="/" className="logo">dAIgnostics</a>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                            <span style={{ color: 'var(--dark-gray)' }}>
-                                Welcome, Dr. {currentDoctor?.username}
-                            </span>
-                            <button onClick={logout} className="btn btn-secondary">
-                                Logout
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </header>
+            <Header />
 
             <div className="patient-list-container">
                 <div className="container">

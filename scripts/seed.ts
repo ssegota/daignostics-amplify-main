@@ -20,9 +20,35 @@ const lastNames = [
 ];
 
 const doctors = [
-    { username: 'drjones', password: 'password123', email: 'drjones@daignostics.info' },
-    { username: 'drsmith', password: 'password123', email: 'drsmith@daignostics.info' },
-    { username: 'drbrown', password: 'password123', email: 'drbrown@daignostics.info' },
+    {
+        username: 'drjones',
+        password: 'password123',
+        email: 'drjones@daignostics.info',
+        firstName: 'Indiana',
+        lastName: 'Jones',
+        primaryInstitution: 'Marshall College',
+        primaryInstitutionAddress: '184 Main St, Bedford, CT 06810'
+    },
+    {
+        username: 'drsmith',
+        password: 'password123',
+        email: 'drsmith@daignostics.info',
+        firstName: 'John',
+        lastName: 'Smith',
+        primaryInstitution: 'General Hospital',
+        primaryInstitutionAddress: '101 Healing Way, Metropolis, NY 10001',
+        secondaryInstitution: 'City Clinic',
+        secondaryInstitutionAddress: '55 Healthy Ave, Gotham, NJ 07001'
+    },
+    {
+        username: 'drbrown',
+        password: 'password123',
+        email: 'drbrown@daignostics.info',
+        firstName: 'Emmett',
+        lastName: 'Brown',
+        primaryInstitution: 'Hill Valley Science Center',
+        primaryInstitutionAddress: '1640 Riverside Dr, Hill Valley, CA 95420'
+    },
 ];
 
 function getRandomElement<T>(array: T[]): T {
