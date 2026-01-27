@@ -91,6 +91,10 @@ const CSVUpload: React.FC<CSVUploadProps> = ({ patientId, patientCognitoId, onUp
             await client.models.Experiment.create(experimentData);
 
             setUploading(false);
+            // Reset the file input to allow uploading the same file again
+            if (inputRef.current) {
+                inputRef.current.value = '';
+            }
             onUploadComplete();
         } catch (err) {
             console.error('Upload error:', err);
