@@ -146,7 +146,9 @@ const Header: React.FC = () => {
             <header className="header">
                 <div className="container">
                     <div className="header-content">
-                        <a href="/" className="logo">dAIgnostics</a>
+                        <a href="https://daignostics.info" target="_blank" rel="noopener noreferrer" className="logo">
+                            <img src="/logo.svg" alt="dAIgnostics" style={{ height: '32px' }} />
+                        </a>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                             <span style={{ color: 'var(--dark-gray)' }}>
                                 Welcome, <span
