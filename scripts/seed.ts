@@ -5,7 +5,8 @@ import {
     CognitoIdentityProviderClient,
     AdminCreateUserCommand,
     AdminSetUserPasswordCommand,
-    AdminDeleteUserCommand
+    AdminDeleteUserCommand,
+    ListUsersCommand
 } from '@aws-sdk/client-cognito-identity-provider';
 import type { Schema } from '../amplify/data/resource';
 import outputs from '../amplify_outputs.json';
@@ -84,24 +85,128 @@ function randomString(length: number): string {
     return result;
 }
 
+const SPECTRAL_FEATURES = [
+    'ch0_total_power', 'ch0_peak_freq', 'ch0_peak_power', 'ch0_centroid', 'ch0_bandwidth',
+    'ch0_rolloff95', 'ch0_flatness', 'ch0_entropy', 'ch0_slope', 'ch0_bp_uSlow',
+    'ch0_bp_slow', 'ch0_bp_mid', 'ch0_bp_fast',
+    'ch1_total_power', 'ch1_peak_freq', 'ch1_peak_power', 'ch1_centroid', 'ch1_bandwidth',
+    'ch1_rolloff95', 'ch1_flatness', 'ch1_entropy', 'ch1_slope', 'ch1_bp_uSlow',
+    'ch1_bp_slow', 'ch1_bp_mid', 'ch1_bp_fast',
+    'ch2_total_power', 'ch2_peak_freq', 'ch2_peak_power', 'ch2_centroid', 'ch2_bandwidth',
+    'ch2_rolloff95', 'ch2_flatness', 'ch2_entropy', 'ch2_slope', 'ch2_bp_uSlow',
+    'ch2_bp_slow', 'ch2_bp_mid', 'ch2_bp_fast'
+];
+
+function generateSpectralFeatures(): Record<string, number> {
+    const features: Record<string, number> = {};
+    SPECTRAL_FEATURES.forEach(feature => {
+        features[feature] = randomFloat(0, 10);
+    });
+    return features;
+}
+
+function generateMLResults() {
+    const prediction = Math.random() > 0.5 ? 1 : 0;
+    const confidence = randomFloat(0.6, 1.0);
+    const prob0 = prediction === 0 ? confidence : 1 - confidence;
+    const prob1 = 1 - prob0;
+
+    // Generate individual results
+    const models = ["DT", "ET", "KNN", "LDA", "GNB", "RFC"];
+    const individualResults = models.map(model => {
+        // Most models agree with consensus
+        const modelPred = Math.random() > 0.2 ? prediction : (1 - prediction);
+        return {
+            model,
+            prediction: modelPred,
+            probabilities: [
+                modelPred === 0 ? randomFloat(0.6, 0.9) : randomFloat(0.1, 0.4),
+                modelPred === 1 ? randomFloat(0.6, 0.9) : randomFloat(0.1, 0.4)
+            ],
+            error: null
+        };
+    });
+
+    const modelsUsed = models.length;
+
+    return {
+        consensusPrediction: prediction,
+        consensusConfidence: confidence,
+        averageProbabilities: JSON.stringify([prob0, prob1]),
+        individualResults: JSON.stringify(individualResults),
+        modelsUsed
+    };
+}
+
 function generateExperiment(patientId: string) {
     const now = new Date();
     const daysAgo = Math.floor(Math.random() * 180); // Random date within last 6 months
     const experimentDate = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000);
 
+    const mlData = generateMLResults();
+
     return {
         patientId,
         patientCognitoId: '', // To be filled in later
-        peakCounts: Math.floor(randomFloat(10, 100)),
-        amplitude: randomFloat(0.5, 10.0),
-        auc: randomFloat(100, 1000),
-        fwhm: randomFloat(0.1, 5.0),
-        frequency: randomFloat(1, 100),
-        snr: randomFloat(5, 50),
-        skewness: randomFloat(-2, 2),
-        kurtosis: randomFloat(1, 10),
         generationDate: experimentDate.toISOString(),
+        spectralFeatures: JSON.stringify(generateSpectralFeatures()),
+        ...mlData
     };
+}
+
+// Function to clean up ALL Cognito users that are not the hardcoded doctors
+async function cleanupOldCognitoUsers() {
+    console.log('🧹 Cleaning up old Cognito users...');
+
+    // List of emails we want to KEEP (the doctors)
+    const doctorEmails = new Set(doctors.map(d => d.email));
+
+    let paginationToken: string | undefined;
+    let deletedCount = 0;
+
+    try {
+        do {
+            const response = await cognitoClient.send(new ListUsersCommand({
+                UserPoolId: authConfig.user_pool_id,
+                PaginationToken: paginationToken
+            }));
+
+            paginationToken = response.PaginationToken;
+
+            for (const user of response.Users || []) {
+                const emailAttr = user.Attributes?.find(a => a.Name === 'email');
+                const email = emailAttr?.Value;
+
+                // If it's a doctor, skip deletion here (the loop below re-creates them anyway, 
+                // but checking here prevents "deletion" log spam if we wanted to preserve them, 
+                // though the main loop deletes doctors anyway. We'll delete non-doctors here.)
+
+                // Actually, let's delete EVERYONE to be clean, or just patients.
+                // The Seed loop deletes doctors. Let's delete only NON-doctors here to save time/calls
+                // and let the loop handle doctors.
+                if (email && doctorEmails.has(email)) {
+                    continue;
+                }
+
+                if (user.Username) {
+                    try {
+                        await cognitoClient.send(new AdminDeleteUserCommand({
+                            UserPoolId: authConfig.user_pool_id,
+                            Username: user.Username
+                        }));
+                        deletedCount++;
+                        if (deletedCount % 10 === 0) process.stdout.write('.');
+                    } catch (e) {
+                        // ignore errors
+                    }
+                }
+            }
+        } while (paginationToken);
+    } catch (err) {
+        console.error('Error listing/deleting users:', err);
+    }
+
+    console.log(`\n   - Deleted ${deletedCount} old Cognito users.`);
 }
 
 async function createCognitoUser(email: string, givenName: string, familyName: string, password = 'Password123!'): Promise<string | null> {
@@ -178,10 +283,6 @@ async function cleanUpDoctorData(doctorUsername: string) {
     }
 
     // Delete doctor profile
-    // Note: We need to find the profile first, as primary key is 'username' (which is the string ID we set)
-    // Wait, the schema uses 'username' as the primary key? No, 'username' is a field. 
-    // Wait, let's check schema: Doctor: model({ username: a.id().required(), ... })
-    // So 'username' IS the primary key.
     try {
         await client.models.Doctor.delete({ username: doctorUsername } as any);
         console.log(`   - Deleted doctor profile`);
@@ -192,6 +293,9 @@ async function cleanUpDoctorData(doctorUsername: string) {
 
 async function seedDatabase() {
     console.log('🌱 Starting database seeding with Cognito integration...\n');
+
+    // Step 0: Clean up OLD patients from Cognito
+    await cleanupOldCognitoUsers();
 
     for (const doctor of doctors) {
         console.log(`\nProcessing Dr. ${doctor.lastName} (${doctor.username})...`);
@@ -291,9 +395,6 @@ async function seedDatabase() {
             const pEmail = `${pFirstName.toLowerCase()}.${pLastName.toLowerCase()}.${Date.now()}@daignostics.info`;
 
             // 5a. Create Cognito User for Patient
-            // NOTE: In a real app, AdminCreateUser usually returns the SUB.
-            // However, to be 100% sure we have the sub matching what signIn returns, we could sign in.
-            // But AdminCreateUser output should contain Attributes including 'sub'.
             const patientSub = await createCognitoUser(pEmail, pFirstName, pLastName, 'Password123!');
 
             if (!patientSub) {

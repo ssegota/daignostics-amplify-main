@@ -64,9 +64,9 @@ const PatientDashboard: React.FC = () => {
                             <thead>
                                 <tr>
                                     <th style={{ textAlign: 'center', padding: '1rem' }}>Date</th>
-                                    <th style={{ textAlign: 'center', padding: '1rem' }}>Peak Counts</th>
-                                    <th style={{ textAlign: 'center', padding: '1rem' }}>Amplitude</th>
-                                    <th style={{ textAlign: 'center', padding: '1rem' }}>Status</th>
+                                    <th style={{ textAlign: 'center', padding: '1rem' }}>Diagnosis</th>
+                                    <th style={{ textAlign: 'center', padding: '1rem' }}>Confidence</th>
+                                    <th style={{ textAlign: 'center', padding: '1rem' }}>Models Agree</th>
                                     <th style={{ textAlign: 'center', padding: '1rem' }}>Actions</th>
                                 </tr>
                             </thead>
@@ -77,12 +77,22 @@ const PatientDashboard: React.FC = () => {
                                         .map((exp) => (
                                             <tr key={exp.id}>
                                                 <td style={{ fontWeight: '500', textAlign: 'center' }}>{new Date(exp.generationDate).toLocaleDateString()}</td>
-                                                <td style={{ textAlign: 'center' }}>{exp.peakCounts.toFixed(1)}</td>
-                                                <td style={{ textAlign: 'center' }}>{exp.amplitude.toFixed(2)}</td>
                                                 <td style={{ textAlign: 'center' }}>
-                                                    <span className={`status-badge ${exp.snr > 10 ? 'status-completed' : 'status-pending'}`}>
-                                                        {exp.snr > 10 ? 'Complete' : 'Processing'}
+                                                    <span style={{
+                                                        color: exp.consensusPrediction === 1 ? '#e74c3c' : '#27ae60',
+                                                        fontWeight: 'bold',
+                                                        padding: '0.25rem 0.5rem',
+                                                        borderRadius: '4px',
+                                                        backgroundColor: exp.consensusPrediction === 1 ? '#fadbd8' : '#d4efdf'
+                                                    }}>
+                                                        {exp.consensusPrediction === 1 ? 'Positive' : 'Negative'}
                                                     </span>
+                                                </td>
+                                                <td style={{ textAlign: 'center' }}>
+                                                    {exp.consensusConfidence ? (exp.consensusConfidence * 100).toFixed(0) + '%' : '-'}
+                                                </td>
+                                                <td style={{ textAlign: 'center' }}>
+                                                    {exp.modelsUsed ? `${exp.modelsUsed}/6` : '-'}
                                                 </td>
                                                 <td style={{ textAlign: 'center' }}>
                                                     <button

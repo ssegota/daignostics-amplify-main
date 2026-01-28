@@ -2,6 +2,7 @@ import { defineBackend } from '@aws-amplify/backend';
 import { auth } from './auth/resource';
 import { data } from './data/resource';
 import { createPatientCognito } from './functions/create-patient-cognito/resource';
+import { predictExperiment } from './functions/predict-experiment/resource';
 import { PolicyStatement, Effect } from 'aws-cdk-lib/aws-iam';
 import { Function } from 'aws-cdk-lib/aws-lambda';
 
@@ -12,6 +13,7 @@ const backend = defineBackend({
   auth,
   data,
   createPatientCognito,
+  predictExperiment,
 });
 
 // Get auth resources
@@ -33,3 +35,13 @@ lambdaFn.addToRolePolicy(
 );
 
 lambdaFn.addEnvironment('USER_POOL_ID', userPoolId);
+
+// Permission for predict-experiment to invoke lambda_master
+const predictFn = backend.predictExperiment.resources.lambda as Function;
+predictFn.addToRolePolicy(
+  new PolicyStatement({
+    effect: Effect.ALLOW,
+    actions: ['lambda:InvokeFunction'],
+    resources: ['arn:aws:lambda:eu-north-1:554095889481:function:lambda_master'],
+  })
+);

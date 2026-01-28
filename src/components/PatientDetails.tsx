@@ -11,15 +11,11 @@ const client = generateClient<Schema>();
 interface Experiment {
     id: string;
     patientId: string;
-    peakCounts: number;
-    amplitude: number;
-    auc: number;
-    fwhm: number;
-    frequency: number;
-    snr: number;
-    skewness: number;
-    kurtosis: number;
     generationDate: string;
+    spectralFeatures: string;
+    consensusPrediction: number | null;
+    consensusConfidence: number | null;
+    modelsUsed: number | null;
 }
 
 interface Patient {
@@ -251,14 +247,26 @@ const PatientDetails: React.FC = () => {
                                         onClick={() => navigate(`/experiment/${experiment.id}`)}
                                         style={{ cursor: 'pointer' }}
                                     >
-                                        <div className="patient-name">
+                                        <div className="patient-name" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            <span style={{
+                                                display: 'inline-block',
+                                                width: '12px',
+                                                height: '12px',
+                                                borderRadius: '50%',
+                                                background: experiment.consensusPrediction === 1 ? '#e74c3c' : '#27ae60'
+                                            }}></span>
                                             Experiment {experiment.id.slice(0, 8)}
                                         </div>
                                         <div className="patient-info">
-                                            Date: {new Date(experiment.generationDate).toLocaleDateString()}
+                                            {new Date(experiment.generationDate).toLocaleDateString()}
                                         </div>
-                                        <div className="patient-info">
-                                            SNR: {experiment.snr.toFixed(2)} | Amplitude: {experiment.amplitude.toFixed(2)}
+                                        <div className="patient-info" style={{
+                                            color: experiment.consensusPrediction === 1 ? '#e74c3c' : '#27ae60',
+                                            fontWeight: 'bold'
+                                        }}>
+                                            {experiment.consensusPrediction === 1 ? 'Positive' : 'Negative'}
+                                            {experiment.consensusConfidence !== null &&
+                                                ` (${(experiment.consensusConfidence * 100).toFixed(0)}%)`}
                                         </div>
                                     </div>
                                 ))}

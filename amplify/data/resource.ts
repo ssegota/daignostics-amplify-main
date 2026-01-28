@@ -1,5 +1,6 @@
 import { type ClientSchema, a, defineData } from '@aws-amplify/backend';
 import { createPatientCognito } from '../functions/create-patient-cognito/resource';
+import { predictExperiment } from '../functions/predict-experiment/resource';
 
 const schema = a.schema({
     Doctor: a
@@ -35,15 +36,15 @@ const schema = a.schema({
         .model({
             patientId: a.string().required(),
             patientCognitoId: a.string(), // Field to grant access to the patient
-            peakCounts: a.float().required(),
-            amplitude: a.float().required(),
-            auc: a.float().required(),
-            fwhm: a.float().required(),
-            frequency: a.float().required(),
-            snr: a.float().required(),
-            skewness: a.float().required(),
-            kurtosis: a.float().required(),
             generationDate: a.datetime().required(),
+            // Spectral features stored as JSON string (39 features)
+            spectralFeatures: a.string().required(),
+            // ML Results
+            consensusPrediction: a.integer(), // 0 or 1
+            consensusConfidence: a.float(),   // 0.0-1.0
+            averageProbabilities: a.string(), // JSON array [prob0, prob1]
+            individualResults: a.string(),    // JSON of per-model results
+            modelsUsed: a.integer(),
         })
         .authorization((allow) => [
             allow.owner(), // Doctor (creator) has full access
@@ -66,6 +67,16 @@ const schema = a.schema({
             error: a.string(),
         }))
         .handler(a.handler.function(createPatientCognito))
+        .authorization((allow) => [allow.authenticated()]),
+
+    // Custom query to invoke ML model
+    predictExperiment: a
+        .query()
+        .arguments({
+            features: a.string().required(),
+        })
+        .returns(a.string())
+        .handler(a.handler.function(predictExperiment))
         .authorization((allow) => [allow.authenticated()]),
 });
 
